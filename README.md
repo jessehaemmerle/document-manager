@@ -50,7 +50,7 @@ Wichtige Variablen:
 - `JWT_SECRET`: Signatur-Secret für Tokens
 - `SMTP_*`: SMTP-Konfiguration
 - `SCHEDULER_ENABLED`: Scheduler aktivieren oder deaktivieren
-- `VITE_API_URL`: URL der REST-API für das Frontend
+- `VITE_API_URL`: API-Pfad für das Frontend, empfohlen `/api`
 
 ## Docker-Start
 
@@ -70,7 +70,7 @@ docker compose run --rm seed
 4. Anwendung öffnen:
 
 - Frontend: `http://localhost:18080`
-- Backend API: `http://localhost:4000/api`
+- API über Frontend-Proxy: `http://localhost:18080/api`
 
 ## Lokale Entwicklung
 
