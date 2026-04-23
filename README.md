@@ -69,7 +69,7 @@ docker compose run --rm seed
 
 4. Anwendung öffnen:
 
-- Frontend: `http://localhost:8080`
+- Frontend: `http://localhost:18080`
 - Backend API: `http://localhost:4000/api`
 
 ## Lokale Entwicklung
