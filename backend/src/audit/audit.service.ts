@@ -10,9 +10,9 @@ interface AuditRecordInput {
   actionType: string;
   entityType: string;
   entityId: string;
-  beforeJson?: Record<string, unknown> | null;
-  afterJson?: Record<string, unknown> | null;
-  contextJson?: Record<string, unknown> | null;
+  beforeJson?: unknown | null;
+  afterJson?: unknown | null;
+  contextJson?: unknown | null;
   comment?: string | null;
 }
 
