@@ -71,6 +71,7 @@ docker compose run --rm seed
 
 - Frontend: `http://localhost:18080`
 - API über Frontend-Proxy: `http://localhost:18080/api`
+- direkter Backend-Zugriff von außen: `http://localhost:14000/api`
 
 ## Lokale Entwicklung
 
