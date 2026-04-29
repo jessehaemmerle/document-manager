@@ -16,8 +16,8 @@ export class UsersController {
 
   @Get()
   @Roles(RoleCode.ADMIN, RoleCode.MANAGER)
-  findAll(@CurrentUser() user: AuthUser, @Query('search') search?: string) {
-    return this.usersService.findAll(user, search);
+  findAll(@CurrentUser() user: AuthUser, @Query('search') search?: string, @Query('includeInactive') includeInactive?: string) {
+    return this.usersService.findAll(user, search, includeInactive === 'true');
   }
 
   @Get('roles')

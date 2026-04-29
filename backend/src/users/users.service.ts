@@ -45,7 +45,7 @@ export class UsersService {
     });
   }
 
-  async findAll(currentUser: AuthUser, search?: string) {
+  async findAll(currentUser: AuthUser, search?: string, includeInactive = false) {
     const where = search
       ? [
           { firstName: ILike(`%${search}%`) },
@@ -55,10 +55,11 @@ export class UsersService {
         ]
       : {};
     const users = await this.userRepo.find({ where, order: { lastName: 'ASC', firstName: 'ASC' } });
+    const activeFiltered = includeInactive ? users : users.filter((user) => user.active);
     const filtered =
       currentUser.roleCode === RoleCode.ADMIN
-        ? users
-        : users.filter((user) => user.department?.id && user.department.id === currentUser.departmentId);
+        ? activeFiltered
+        : activeFiltered.filter((user) => user.department?.id && user.department.id === currentUser.departmentId);
     return filtered.map((user) => this.toSafeUser(user));
   }
 
