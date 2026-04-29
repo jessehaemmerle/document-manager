@@ -243,6 +243,18 @@ th {
   margin-bottom: 18px;
 }
 
+.edit-user-form {
+  margin-top: 18px;
+  padding-top: 18px;
+  border-top: 1px solid rgba(16, 36, 62, 0.08);
+}
+
+.action-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
 .deactivate-box {
   display: grid;
   gap: 12px;

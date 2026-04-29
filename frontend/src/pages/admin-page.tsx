@@ -2,7 +2,42 @@ import { FormEvent, useEffect, useState } from 'react';
 import { useAuth } from '../context/auth-context';
 import { api } from '../lib/api';
 import { formatDate } from '../lib/format';
-import type { AuditLog, Department, DocumentType, EmailTemplate, Role, SettingsItem, User } from '../types/api';
+import type { AuditLog, Department, DocumentType, EmailTemplate, Role, RoleCode, SettingsItem, User } from '../types/api';
+
+type UserFormState = {
+  firstName: string;
+  lastName: string;
+  email: string;
+  username: string;
+  password: string;
+  roleCode: RoleCode;
+  departmentId: string;
+  active: boolean;
+};
+
+const initialUserForm: UserFormState = {
+  firstName: '',
+  lastName: '',
+  email: '',
+  username: '',
+  password: '',
+  roleCode: 'employee',
+  departmentId: '',
+  active: true,
+};
+
+function toUserForm(entry: User): UserFormState {
+  return {
+    firstName: entry.firstName,
+    lastName: entry.lastName,
+    email: entry.email,
+    username: entry.username,
+    password: '',
+    roleCode: entry.role.code,
+    departmentId: entry.department?.id ?? '',
+    active: entry.active,
+  };
+}
 
 export function AdminPage() {
   const { token, user } = useAuth();
@@ -14,17 +49,11 @@ export function AdminPage() {
   const [templates, setTemplates] = useState<EmailTemplate[]>([]);
   const [audit, setAudit] = useState<{ items: AuditLog[] } | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [editingUserId, setEditingUserId] = useState<string | null>(null);
   const [newDepartment, setNewDepartment] = useState({ name: '', description: '' });
   const [newType, setNewType] = useState({ name: '', description: '' });
-  const [newUser, setNewUser] = useState({
-    firstName: '',
-    lastName: '',
-    email: '',
-    username: '',
-    password: '',
-    roleCode: 'employee',
-    departmentId: '',
-  });
+  const [newUser, setNewUser] = useState<UserFormState>(initialUserForm);
+  const [editUser, setEditUser] = useState<UserFormState>(initialUserForm);
 
   const isAdmin = user?.role.code === 'admin';
 
@@ -60,33 +89,107 @@ export function AdminPage() {
   const createDepartment = async (event: FormEvent) => {
     event.preventDefault();
     if (!token) return;
-    await api('/departments', { method: 'POST', token, body: JSON.stringify(newDepartment) });
-    setNewDepartment({ name: '', description: '' });
-    await load();
+    try {
+      await api('/departments', { method: 'POST', token, body: JSON.stringify(newDepartment) });
+      setNewDepartment({ name: '', description: '' });
+      await load();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Abteilung konnte nicht angelegt werden.');
+    }
   };
 
   const createType = async (event: FormEvent) => {
     event.preventDefault();
     if (!token) return;
-    await api('/document-types', { method: 'POST', token, body: JSON.stringify(newType) });
-    setNewType({ name: '', description: '' });
-    await load();
+    try {
+      await api('/document-types', { method: 'POST', token, body: JSON.stringify(newType) });
+      setNewType({ name: '', description: '' });
+      await load();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Dokumenttyp konnte nicht angelegt werden.');
+    }
   };
 
   const createUser = async (event: FormEvent) => {
     event.preventDefault();
     if (!token) return;
-    await api('/users', { method: 'POST', token, body: JSON.stringify(newUser) });
-    setNewUser({
-      firstName: '',
-      lastName: '',
-      email: '',
-      username: '',
-      password: '',
-      roleCode: 'employee',
-      departmentId: '',
-    });
-    await load();
+    try {
+      await api('/users', {
+        method: 'POST',
+        token,
+        body: JSON.stringify({
+          firstName: newUser.firstName,
+          lastName: newUser.lastName,
+          email: newUser.email,
+          username: newUser.username,
+          password: newUser.password,
+          roleCode: newUser.roleCode,
+          departmentId: newUser.departmentId || undefined,
+        }),
+      });
+      setNewUser(initialUserForm);
+      await load();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Benutzer konnte nicht angelegt werden.');
+    }
+  };
+
+  const startEditingUser = (entry: User) => {
+    setEditingUserId(entry.id);
+    setEditUser(toUserForm(entry));
+    setError(null);
+  };
+
+  const cancelEditingUser = () => {
+    setEditingUserId(null);
+    setEditUser(initialUserForm);
+  };
+
+  const saveUser = async (event: FormEvent) => {
+    event.preventDefault();
+    if (!token || !editingUserId) return;
+
+    try {
+      await api(`/users/${editingUserId}`, {
+        method: 'PUT',
+        token,
+        body: JSON.stringify({
+          firstName: editUser.firstName,
+          lastName: editUser.lastName,
+          email: editUser.email,
+          username: editUser.username,
+          password: editUser.password.trim() || undefined,
+          roleCode: editUser.roleCode,
+          departmentId: editUser.departmentId || null,
+          active: editUser.active,
+        }),
+      });
+      cancelEditingUser();
+      await load();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Benutzer konnte nicht gespeichert werden.');
+    }
+  };
+
+  const deleteUser = async (entry: User) => {
+    if (!token) return;
+    if (entry.id === user?.id) {
+      setError('Das eigene Administrationskonto kann hier nicht geloescht werden.');
+      return;
+    }
+
+    const confirmed = window.confirm(`Soll ${entry.firstName} ${entry.lastName} wirklich geloescht werden?`);
+    if (!confirmed) return;
+
+    try {
+      await api(`/users/${entry.id}`, { method: 'DELETE', token });
+      if (editingUserId === entry.id) {
+        cancelEditingUser();
+      }
+      await load();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Benutzer konnte nicht geloescht werden.');
+    }
   };
 
   const exportAudit = async () => {
@@ -104,7 +207,7 @@ export function AdminPage() {
   };
 
   if (!isAdmin) {
-    return <section className="card page-panel">Der Admin-Bereich ist nur für Administratoren sichtbar.</section>;
+    return <section className="card page-panel">Der Admin-Bereich ist nur fuer Administratoren sichtbar.</section>;
   }
 
   return (
@@ -112,14 +215,14 @@ export function AdminPage() {
       {error && <div className="error-box">{error}</div>}
       <article className="card page-panel">
         <span className="eyebrow">Benutzer</span>
-        <h2>Benutzerübersicht</h2>
+        <h2>Benutzeruebersicht</h2>
         <form className="form-grid user-form" onSubmit={createUser}>
           <input required placeholder="Vorname" value={newUser.firstName} onChange={(event) => setNewUser((current) => ({ ...current, firstName: event.target.value }))} />
           <input required placeholder="Nachname" value={newUser.lastName} onChange={(event) => setNewUser((current) => ({ ...current, lastName: event.target.value }))} />
           <input required type="email" placeholder="E-Mail" value={newUser.email} onChange={(event) => setNewUser((current) => ({ ...current, email: event.target.value }))} />
           <input required placeholder="Benutzername" value={newUser.username} onChange={(event) => setNewUser((current) => ({ ...current, username: event.target.value }))} />
           <input required minLength={8} type="password" placeholder="Passwort" value={newUser.password} onChange={(event) => setNewUser((current) => ({ ...current, password: event.target.value }))} />
-          <select value={newUser.roleCode} onChange={(event) => setNewUser((current) => ({ ...current, roleCode: event.target.value }))}>
+          <select value={newUser.roleCode} onChange={(event) => setNewUser((current) => ({ ...current, roleCode: event.target.value as RoleCode }))}>
             {roles.map((role) => (
               <option key={role.id} value={role.code}>
                 {role.name}
@@ -127,7 +230,7 @@ export function AdminPage() {
             ))}
           </select>
           <select value={newUser.departmentId} onChange={(event) => setNewUser((current) => ({ ...current, departmentId: event.target.value }))}>
-            <option value="">Abteilung wählen</option>
+            <option value="">Abteilung waehlen</option>
             {departments.map((department) => (
               <option key={department.id} value={department.id}>
                 {department.name}
@@ -144,6 +247,7 @@ export function AdminPage() {
                 <th>Rolle</th>
                 <th>Abteilung</th>
                 <th>Status</th>
+                <th>Aktionen</th>
               </tr>
             </thead>
             <tbody>
@@ -153,13 +257,66 @@ export function AdminPage() {
                     {entry.firstName} {entry.lastName}
                   </td>
                   <td>{entry.role.name}</td>
-                  <td>{entry.department?.name || '—'}</td>
+                  <td>{entry.department?.name || '-'}</td>
                   <td>{entry.active ? 'Aktiv' : 'Inaktiv'}</td>
+                  <td>
+                    <div className="action-row">
+                      <button type="button" className="secondary-button" onClick={() => startEditingUser(entry)}>
+                        Bearbeiten
+                      </button>
+                      <button
+                        type="button"
+                        className="secondary-button danger-button"
+                        onClick={() => void deleteUser(entry)}
+                        disabled={entry.id === user?.id}
+                        title={entry.id === user?.id ? 'Das eigene Konto kann nicht geloescht werden.' : undefined}
+                      >
+                        Loeschen
+                      </button>
+                    </div>
+                  </td>
                 </tr>
               ))}
             </tbody>
           </table>
         </div>
+        {editingUserId && (
+          <form className="form-grid user-form edit-user-form" onSubmit={saveUser}>
+            <h3 className="full-span">Benutzer bearbeiten</h3>
+            <input required placeholder="Vorname" value={editUser.firstName} onChange={(event) => setEditUser((current) => ({ ...current, firstName: event.target.value }))} />
+            <input required placeholder="Nachname" value={editUser.lastName} onChange={(event) => setEditUser((current) => ({ ...current, lastName: event.target.value }))} />
+            <input required type="email" placeholder="E-Mail" value={editUser.email} onChange={(event) => setEditUser((current) => ({ ...current, email: event.target.value }))} />
+            <input required placeholder="Benutzername" value={editUser.username} onChange={(event) => setEditUser((current) => ({ ...current, username: event.target.value }))} />
+            <input minLength={8} type="password" placeholder="Neues Passwort (optional)" value={editUser.password} onChange={(event) => setEditUser((current) => ({ ...current, password: event.target.value }))} />
+            <select value={editUser.roleCode} onChange={(event) => setEditUser((current) => ({ ...current, roleCode: event.target.value as RoleCode }))}>
+              {roles.map((role) => (
+                <option key={role.id} value={role.code}>
+                  {role.name}
+                </option>
+              ))}
+            </select>
+            <select value={editUser.departmentId} onChange={(event) => setEditUser((current) => ({ ...current, departmentId: event.target.value }))}>
+              <option value="">Abteilung waehlen</option>
+              {departments.map((department) => (
+                <option key={department.id} value={department.id}>
+                  {department.name}
+                </option>
+              ))}
+            </select>
+            <label className="checkbox-row">
+              <input type="checkbox" checked={editUser.active} onChange={(event) => setEditUser((current) => ({ ...current, active: event.target.checked }))} />
+              Benutzer ist aktiv
+            </label>
+            <div className="button-row full-span">
+              <button className="primary-button" type="submit">
+                Aenderungen speichern
+              </button>
+              <button className="secondary-button" type="button" onClick={cancelEditingUser}>
+                Abbrechen
+              </button>
+            </div>
+          </form>
+        )}
       </article>
 
       <article className="card page-panel">
@@ -240,7 +397,7 @@ export function AdminPage() {
               <strong>{entry.actionType}</strong>
               <span>{formatDate(entry.createdAt)}</span>
               <p>
-                {entry.entityType} · {entry.entityId}
+                {entry.entityType} - {entry.entityId}
               </p>
             </div>
           ))}
