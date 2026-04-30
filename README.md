@@ -71,6 +71,7 @@ Die App enthält eine einfache Benutzerverwaltung unter `Benutzer`:
 - Optionaler Vorgesetzter pro Benutzer
 - Optionaler Vorgesetzter pro Abteilung
 - Benutzer werden beim Löschen deaktiviert, nicht physisch entfernt
+- Hat ein Benutzer noch persönlich zugewiesene Dokumente, müssen diese beim Deaktivieren auf einen anderen aktiven Benutzer übertragen werden
 
 Dokumente besitzen zusätzlich eine `Audit-Abteilung` und optional einen persönlich zugewiesenen Benutzer. Diese Felder steuern die Sichtbarkeit für Führungskräfte und Mitarbeiter.
 
@@ -85,8 +86,9 @@ Zusätzliche API-Endpunkte:
 - `GET /api/auth/me`
 - `GET /api/users`
 - `GET /api/users/:id`
+- `GET /api/users/:id/assigned-documents`
 - `POST /api/users`
 - `PUT /api/users/:id`
-- `DELETE /api/users/:id`
+- `DELETE /api/users/:id` mit optionalem Body `{ "replacement_user_id": 2 }` zur Übertragung zugewiesener Dokumente
 - `GET /api/departments/:id/users`
 - `GET /api/export/users`

@@ -68,6 +68,28 @@ usersRouter.get("/", requireRole("Admin"), async (req, res, next) => {
   }
 });
 
+usersRouter.get("/:id/assigned-documents", requireRole("Admin"), async (req, res, next) => {
+  try {
+    const documents = await all(`
+      SELECT
+        d.id,
+        d.title,
+        d.status,
+        d.next_audit_date,
+        dep.name AS department_name,
+        audit_dep.name AS audit_department_name
+      FROM documents d
+      JOIN departments dep ON dep.id = d.department_id
+      LEFT JOIN departments audit_dep ON audit_dep.id = COALESCE(d.audit_department_id, d.department_id)
+      WHERE d.assigned_user_id = ?
+      ORDER BY d.next_audit_date ASC, d.title ASC
+    `, [req.params.id]);
+    res.json(documents);
+  } catch (error) {
+    next(error);
+  }
+});
+
 usersRouter.get("/:id", requireRole("Admin"), async (req, res, next) => {
   try {
     const user = await get(`${userSelect} WHERE u.id = ?`, [req.params.id]);
@@ -122,6 +144,21 @@ usersRouter.put("/:id", requireRole("Admin"), async (req, res, next) => {
 
 usersRouter.delete("/:id", requireRole("Admin"), async (req, res, next) => {
   try {
+    const assigned = await get("SELECT COUNT(*) AS count FROM documents WHERE assigned_user_id = ?", [req.params.id]);
+    if (assigned.count) {
+      const replacementUserId = req.body?.replacement_user_id;
+      if (!replacementUserId) {
+        throw Object.assign(new Error("Diesem Benutzer sind noch Dokumente zugewiesen. Bitte einen Ersatzbenutzer auswählen."), { status: 409 });
+      }
+      if (Number(replacementUserId) === Number(req.params.id)) {
+        throw Object.assign(new Error("Ersatzbenutzer darf nicht derselbe Benutzer sein."), { status: 400 });
+      }
+      const replacement = await get("SELECT id FROM users WHERE id = ? AND is_active = 1", [replacementUserId]);
+      if (!replacement) {
+        throw Object.assign(new Error("Ersatzbenutzer ist nicht aktiv oder existiert nicht."), { status: 400 });
+      }
+      await run("UPDATE documents SET assigned_user_id = ?, updated_at = CURRENT_TIMESTAMP WHERE assigned_user_id = ?", [replacementUserId, req.params.id]);
+    }
     await run("UPDATE users SET is_active = 0, updated_at = CURRENT_TIMESTAMP WHERE id = ?", [req.params.id]);
     res.status(204).send();
   } catch (error) {

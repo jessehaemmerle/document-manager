@@ -550,6 +550,15 @@ td small {
   cursor: pointer;
 }
 
+.reassignment-list {
+  display: grid;
+  max-height: 320px;
+  overflow: auto;
+  margin: 16px 0;
+  border-top: 1px solid var(--line);
+  border-bottom: 1px solid var(--line);
+}
+
 .alert,
 .success,
 .empty {

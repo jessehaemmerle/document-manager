@@ -621,6 +621,7 @@ function UsersPage() {
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
   const [form, setForm] = useState(emptyUserForm());
+  const [reassignment, setReassignment] = useState(null);
 
   const resetForm = () => {
     setEditing(null);
@@ -649,9 +650,36 @@ function UsersPage() {
 
   const deactivate = async (id) => {
     try {
+      const target = users.data.find((user) => user.id === id) || { id, full_name: "Benutzer" };
+      const assignedDocuments = await api(`/users/${id}/assigned-documents`);
+      if (assignedDocuments.length) {
+        setReassignment({ user: target, documents: assignedDocuments, replacement_user_id: "" });
+        return;
+      }
+      if (!confirm("Benutzer deaktivieren?")) return;
       await api(`/users/${id}`, { method: "DELETE" }, role);
-      users.refresh();
-      departments.refresh();
+      setMessage("Benutzer wurde deaktiviert.");
+      await users.refresh();
+      await departments.refresh();
+    } catch (err) {
+      setError(err.message);
+    }
+  };
+
+  const confirmReassignment = async () => {
+    try {
+      if (!reassignment?.replacement_user_id) {
+        alert("Bitte einen Ersatzbenutzer auswählen.");
+        return;
+      }
+      await api(`/users/${reassignment.user.id}`, {
+        method: "DELETE",
+        body: JSON.stringify({ replacement_user_id: Number(reassignment.replacement_user_id) })
+      }, role);
+      setMessage("Zugewiesene Dokumente wurden übertragen und der Benutzer wurde deaktiviert.");
+      setReassignment(null);
+      await users.refresh();
+      await departments.refresh();
     } catch (err) {
       setError(err.message);
     }
@@ -720,6 +748,54 @@ function UsersPage() {
             </form>
           )}
         </Panel>
+      </div>
+      {reassignment && (
+        <ReassignmentModal
+          reassignment={reassignment}
+          users={users.data}
+          onChange={setReassignment}
+          onCancel={() => setReassignment(null)}
+          onConfirm={confirmReassignment}
+        />
+      )}
+    </div>
+  );
+}
+
+function ReassignmentModal({ reassignment, users, onChange, onCancel, onConfirm }) {
+  const replacementUsers = users.filter((user) => user.is_active && user.id !== reassignment.user.id);
+  return (
+    <div className="modal-backdrop">
+      <div className="modal">
+        <div className="modal-head">
+          <h3>Dokumente neu zuweisen</h3>
+          <button className="icon" title="Schließen" onClick={onCancel}><X size={17} /></button>
+        </div>
+        <p className="hint">
+          {reassignment.user.full_name} hat noch {reassignment.documents.length} Dokumentenzuweisung(en). Wähle einen Ersatzbenutzer, bevor der Benutzer deaktiviert wird.
+        </p>
+        <Field label="Ersatzbenutzer *">
+          <select value={reassignment.replacement_user_id} onChange={(event) => onChange({ ...reassignment, replacement_user_id: event.target.value })}>
+            <option value="">Bitte auswählen</option>
+            {replacementUsers.map((user) => <option key={user.id} value={user.id}>{user.full_name} · {user.department_name || "ohne Abteilung"}</option>)}
+          </select>
+        </Field>
+        <div className="reassignment-list">
+          {reassignment.documents.map((document) => (
+            <div className="list-item" key={document.id}>
+              <div>
+                <strong>{document.title}</strong>
+                <p>{document.audit_department_name || document.department_name}</p>
+                <small>Nächstes Audit: {formatDate(document.next_audit_date)}</small>
+              </div>
+              <StatusBadge value={document.status} />
+            </div>
+          ))}
+        </div>
+        <div className="form-actions">
+          <button className="button ghost" type="button" onClick={onCancel}>Abbrechen</button>
+          <button className="button" type="button" onClick={onConfirm}>Übertragen und deaktivieren</button>
+        </div>
       </div>
     </div>
   );
