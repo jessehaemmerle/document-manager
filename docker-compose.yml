@@ -1,0 +1,21 @@
+services:
+  backend:
+    build: ./backend
+    environment:
+      PORT: 4000
+      DATABASE_PATH: /app/data/document-audits.sqlite
+      CLIENT_ORIGIN: http://localhost:8080
+    volumes:
+      - audit-data:/app/data
+    ports:
+      - "4000:4000"
+
+  frontend:
+    build: ./frontend
+    depends_on:
+      - backend
+    ports:
+      - "8080:80"
+
+volumes:
+  audit-data:

@@ -1,0 +1,17 @@
+{
+  "name": "document-audit-manager",
+  "version": "1.0.0",
+  "private": true,
+  "workspaces": [
+    "backend",
+    "frontend"
+  ],
+  "scripts": {
+    "dev": "concurrently \"npm --workspace backend run dev\" \"npm --workspace frontend run dev\"",
+    "start": "npm --workspace backend start",
+    "seed": "npm --workspace backend run seed"
+  },
+  "devDependencies": {
+    "concurrently": "^8.2.2"
+  }
+}
