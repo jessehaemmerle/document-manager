@@ -1,4 +1,4 @@
-import { run, get } from "./database.js";
+import { all, run, get } from "./database.js";
 import { addDays, todayIso } from "../utils/dates.js";
 
 const departments = [
@@ -8,6 +8,19 @@ const departments = [
   ["Verwaltung", "Interne Richtlinien und Vorlagen", "Julia Weiss"],
   ["Einkauf", "Lieferanten- und Beschaffungsprozesse", "Markus Fink"],
   ["Logistik", "Lager, Versand und Warenfluss", "Nina Hofer"]
+];
+
+const users = [
+  ["Miriam", "Keller", "miriam.keller@example.com", "Admin", "Vorgesetzter", "IT-Leiterin", "IT", null],
+  ["David", "Rauch", "david.rauch@example.com", "Auditor", "Mitarbeiter", "System Engineer", "IT", "miriam.keller@example.com"],
+  ["Thomas", "Berger", "thomas.berger@example.com", "Auditor", "Vorgesetzter", "Produktionsleiter", "Produktion", null],
+  ["Lea", "Hartmann", "lea.hartmann@example.com", "Mitarbeiter", "Mitarbeiter", "Schichtkoordination", "Produktion", "thomas.berger@example.com"],
+  ["Anna", "Leitner", "anna.leitner@example.com", "Auditor", "Vorgesetzter", "QS-Leitung", "Qualitätssicherung", null],
+  ["Sophie", "Audit", "sophie.audit@example.com", "Auditor", "Mitarbeiter", "Audit Specialist", "Qualitätssicherung", "anna.leitner@example.com"],
+  ["Julia", "Weiss", "julia.weiss@example.com", "Admin", "Vorgesetzter", "Verwaltungsleitung", "Verwaltung", null],
+  ["Markus", "Fink", "markus.fink@example.com", "Mitarbeiter", "Vorgesetzter", "Einkaufsleitung", "Einkauf", null],
+  ["Nina", "Hofer", "nina.hofer@example.com", "Viewer", "Vorgesetzter", "Logistikleitung", "Logistik", null],
+  ["Max", "Pruefer", "max.pruefer@example.com", "Auditor", "Mitarbeiter", "Interner Auditor", "Verwaltung", "julia.weiss@example.com"]
 ];
 
 const documents = [
@@ -24,17 +37,57 @@ const documents = [
 ];
 
 export async function seedDatabase() {
-  const existing = await get("SELECT COUNT(*) AS count FROM departments");
-  if (existing?.count) return;
-
+  const existingDepartments = await get("SELECT COUNT(*) AS count FROM departments");
   const departmentIds = new Map();
-  for (const department of departments) {
-    const result = await run(
-      "INSERT INTO departments (name, description, responsible_person) VALUES (?, ?, ?)",
-      department
-    );
-    departmentIds.set(department[0], result.id);
+  if (!existingDepartments?.count) {
+    for (const department of departments) {
+      const result = await run(
+        "INSERT INTO departments (name, description, responsible_person) VALUES (?, ?, ?)",
+        department
+      );
+      departmentIds.set(department[0], result.id);
+    }
+  } else {
+    const rows = await all("SELECT id, name FROM departments");
+    rows.forEach((department) => departmentIds.set(department.name, department.id));
   }
+
+  const userIds = new Map();
+  const existingUsers = await get("SELECT COUNT(*) AS count FROM users");
+  if (!existingUsers?.count) {
+    for (const user of users) {
+      const [firstName, lastName, email, appRole, employeeRole, jobTitle, departmentName] = user;
+      const result = await run(
+        `INSERT INTO users (
+          first_name, last_name, email, app_role, employee_role, job_title, department_id
+        ) VALUES (?, ?, ?, ?, ?, ?, ?)`,
+        [firstName, lastName, email, appRole, employeeRole, jobTitle, departmentIds.get(departmentName)]
+      );
+      userIds.set(email, result.id);
+    }
+
+    for (const user of users) {
+      const [, , email, , , , , managerEmail] = user;
+      if (managerEmail) {
+        await run("UPDATE users SET manager_id = ? WHERE email = ?", [userIds.get(managerEmail), email]);
+      }
+    }
+
+    const supervisors = [
+      ["IT", "miriam.keller@example.com"],
+      ["Produktion", "thomas.berger@example.com"],
+      ["Qualitätssicherung", "anna.leitner@example.com"],
+      ["Verwaltung", "julia.weiss@example.com"],
+      ["Einkauf", "markus.fink@example.com"],
+      ["Logistik", "nina.hofer@example.com"]
+    ];
+    for (const [departmentName, email] of supervisors) {
+      await run("UPDATE departments SET supervisor_user_id = ? WHERE name = ?", [userIds.get(email), departmentName]);
+    }
+  }
+
+  const existingDocuments = await get("SELECT COUNT(*) AS count FROM documents");
+  if (existingDocuments?.count) return;
 
   const today = todayIso();
   const documentIds = [];

@@ -357,13 +357,15 @@ td small {
 
 .status-aktiv,
 .due-nicht-faellig,
-.result-in-ordnung {
+.result-in-ordnung,
+.role-admin {
   background: #e3f4ea;
   color: var(--green);
 }
 
 .status-in-pruefung,
-.due-faellig {
+.due-faellig,
+.role-auditor {
   background: #fff2d6;
   color: var(--amber);
 }
@@ -381,9 +383,16 @@ td small {
 }
 
 .status-archiviert,
-.result-nicht-mehr-relevant {
+.result-nicht-mehr-relevant,
+.role-viewer,
+.neutral {
   background: #edf0f3;
   color: #516170;
+}
+
+.role-mitarbeiter {
+  background: #e7f0fb;
+  color: var(--blue);
 }
 
 .bars {
@@ -465,6 +474,22 @@ td small {
 
 .list-item:last-child {
   border-bottom: 0;
+}
+
+.muted-row {
+  opacity: 0.66;
+}
+
+.toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  color: var(--muted);
+  font-weight: 800;
+}
+
+.toggle input {
+  width: auto;
 }
 
 .alert,

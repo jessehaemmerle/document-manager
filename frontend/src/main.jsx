@@ -18,6 +18,7 @@ import {
   Settings,
   ShieldCheck,
   Trash2,
+  Users,
   X
 } from "lucide-react";
 import "./styles.css";
@@ -29,6 +30,8 @@ const documentTypes = ["Richtlinie", "Arbeitsanweisung", "Prozessbeschreibung", 
 const statuses = ["Entwurf", "Aktiv", "In Prüfung", "Überarbeitung erforderlich", "Archiviert"];
 const intervals = ["Monatlich", "Quartalsweise", "Halbjährlich", "Jährlich", "Benutzerdefiniert"];
 const dueStates = ["Alle", "Fällig", "Überfällig", "Nicht fällig"];
+const userRoles = ["Admin", "Auditor", "Viewer", "Mitarbeiter"];
+const employeeRoles = ["Vorgesetzter", "Mitarbeiter"];
 
 function useRole() {
   return useContext(RolesContext);
@@ -79,6 +82,7 @@ function App() {
             <Route path="/documents/:id/edit" element={<DocumentForm />} />
             <Route path="/due" element={<DueAudits />} />
             <Route path="/departments" element={<Departments />} />
+            <Route path="/users" element={<UsersPage />} />
             <Route path="/history" element={<AuditHistory />} />
             <Route path="/settings" element={<SettingsPage />} />
           </Routes>
@@ -95,6 +99,7 @@ function Shell({ children }) {
     ["/documents", Files, "Dokumente"],
     ["/due", BellRing, "Fällige Audits"],
     ["/departments", Building2, "Abteilungen"],
+    ["/users", Users, "Benutzer"],
     ["/history", History, "Audit-Historie"],
     ["/settings", Settings, "Admin"]
   ];
@@ -126,6 +131,7 @@ function Shell({ children }) {
               <option>Admin</option>
               <option>Auditor</option>
               <option>Viewer</option>
+              <option>Mitarbeiter</option>
             </select>
           </label>
         </header>
@@ -168,6 +174,7 @@ function Dashboard() {
         <StatCard icon={BellRing} label="Fällige Audits" value={stats.data.dueAudits} tone="warning" />
         <StatCard icon={Archive} label="Überfällige Audits" value={stats.data.overdueAudits} tone="danger" />
         <StatCard icon={CheckCircle2} label="Erledigt im Monat" value={stats.data.auditsThisMonth} tone="success" />
+        <StatCard icon={Users} label="Aktive Benutzer" value={stats.data.activeUsers} />
       </div>
       <div className="grid two">
         <Panel title="Dokumente nach Status">
@@ -431,7 +438,8 @@ function DueAudits() {
 function Departments() {
   const { role, canManage } = useRole();
   const departments = useApi("/departments", []);
-  const [form, setForm] = useState({ name: "", description: "", responsible_person: "" });
+  const users = useApi("/users", []);
+  const [form, setForm] = useState({ name: "", description: "", responsible_person: "", supervisor_user_id: "" });
   const [editing, setEditing] = useState(null);
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
@@ -440,7 +448,7 @@ function Departments() {
     event.preventDefault();
     try {
       await api(editing ? `/departments/${editing}` : "/departments", { method: editing ? "PUT" : "POST", body: JSON.stringify(form) }, role);
-      setForm({ name: "", description: "", responsible_person: "" });
+      setForm({ name: "", description: "", responsible_person: "", supervisor_user_id: "" });
       setEditing(null);
       setMessage("Abteilung wurde gespeichert.");
       departments.refresh();
@@ -463,8 +471,12 @@ function Departments() {
       <Panel title="Abteilungen">
         {departments.data.map((department) => (
           <div className="list-item" key={department.id}>
-            <div><strong>{department.name}</strong><p>{department.description}</p><small>{department.responsible_person}</small></div>
-            {canManage && <div className="row-actions"><button className="icon" onClick={() => { setEditing(department.id); setForm(department); }}><Pencil size={16} /></button><button className="icon danger" onClick={() => remove(department.id)}><Trash2 size={16} /></button></div>}
+            <div>
+              <strong>{department.name}</strong>
+              <p>{department.description}</p>
+              <small>{department.member_count || 0} Benutzer · Vorgesetzter: {department.supervisor_name || department.responsible_person || "-"}</small>
+            </div>
+            {canManage && <div className="row-actions"><button className="icon" onClick={() => { setEditing(department.id); setForm({ ...department, supervisor_user_id: department.supervisor_user_id || "" }); }}><Pencil size={16} /></button><button className="icon danger" onClick={() => remove(department.id)}><Trash2 size={16} /></button></div>}
           </div>
         ))}
       </Panel>
@@ -475,10 +487,151 @@ function Departments() {
             <Field label="Name *"><input required value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} /></Field>
             <Field label="Beschreibung"><textarea value={form.description || ""} onChange={(e) => setForm({ ...form, description: e.target.value })} /></Field>
             <Field label="Kontaktperson"><input value={form.responsible_person || ""} onChange={(e) => setForm({ ...form, responsible_person: e.target.value })} /></Field>
-            <div className="form-actions"><button className="button" type="submit">Speichern</button>{editing && <button type="button" className="button ghost" onClick={() => { setEditing(null); setForm({ name: "", description: "", responsible_person: "" }); }}>Neu</button>}</div>
+            <Field label="Vorgesetzter">
+              <select value={form.supervisor_user_id || ""} onChange={(e) => setForm({ ...form, supervisor_user_id: e.target.value })}>
+                <option value="">Nicht zugewiesen</option>
+                {users.data.filter((user) => user.is_active).map((user) => <option key={user.id} value={user.id}>{user.full_name} · {user.department_name || "ohne Abteilung"}</option>)}
+              </select>
+            </Field>
+            <div className="form-actions"><button className="button" type="submit">Speichern</button>{editing && <button type="button" className="button ghost" onClick={() => { setEditing(null); setForm({ name: "", description: "", responsible_person: "", supervisor_user_id: "" }); }}>Neu</button>}</div>
           </form>
         )}
       </Panel>
+    </div>
+  );
+}
+
+function UsersPage() {
+  const { role, canManage } = useRole();
+  const departments = useApi("/departments", []);
+  const [filters, setFilters] = useState({ search: "", department_id: "", app_role: "" });
+  const query = new URLSearchParams(Object.entries(filters).filter(([, value]) => value)).toString();
+  const users = useApi(`/users?${query}`, []);
+  const [editing, setEditing] = useState(null);
+  const [message, setMessage] = useState("");
+  const [error, setError] = useState("");
+  const [form, setForm] = useState(emptyUserForm());
+
+  const resetForm = () => {
+    setEditing(null);
+    setForm(emptyUserForm());
+    setError("");
+  };
+
+  const submit = async (event) => {
+    event.preventDefault();
+    try {
+      const payload = {
+        ...form,
+        department_id: form.department_id ? Number(form.department_id) : null,
+        manager_id: form.manager_id ? Number(form.manager_id) : null,
+        is_active: Boolean(form.is_active)
+      };
+      await api(editing ? `/users/${editing}` : "/users", { method: editing ? "PUT" : "POST", body: JSON.stringify(payload) }, role);
+      setMessage("Benutzer wurde gespeichert.");
+      resetForm();
+      users.refresh();
+      departments.refresh();
+    } catch (err) {
+      setError(err.message);
+    }
+  };
+
+  const deactivate = async (id) => {
+    try {
+      await api(`/users/${id}`, { method: "DELETE" }, role);
+      users.refresh();
+      departments.refresh();
+    } catch (err) {
+      setError(err.message);
+    }
+  };
+
+  const selectUser = (user) => {
+    setEditing(user.id);
+    setForm({
+      first_name: user.first_name,
+      last_name: user.last_name,
+      email: user.email,
+      app_role: user.app_role,
+      employee_role: user.employee_role || "Mitarbeiter",
+      job_title: user.job_title || "",
+      department_id: user.department_id || "",
+      manager_id: user.manager_id || "",
+      is_active: Boolean(user.is_active)
+    });
+  };
+
+  const activeUsers = users.data.filter((user) => user.is_active && user.id !== editing);
+
+  return (
+    <div className="stack">
+      <div className="page-actions">
+        <div>
+          <h2>Benutzerverwaltung</h2>
+          <p>Benutzer, Rollen, Abteilungszuordnung und Vorgesetzte verwalten.</p>
+        </div>
+        <button className="button secondary" onClick={() => download("/export/users")}><Download size={17} /> CSV</button>
+      </div>
+
+      <Panel>
+        <div className="filters user-filters">
+          <label className="search-field"><Search size={17} /><input placeholder="Name oder E-Mail suchen" value={filters.search} onChange={(e) => setFilters({ ...filters, search: e.target.value })} /></label>
+          <select value={filters.department_id} onChange={(e) => setFilters({ ...filters, department_id: e.target.value })}><option value="">Alle Abteilungen</option>{departments.data.map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}</select>
+          <select value={filters.app_role} onChange={(e) => setFilters({ ...filters, app_role: e.target.value })}><option value="">Alle Rollen</option>{userRoles.map((x) => <option key={x}>{x}</option>)}</select>
+        </div>
+      </Panel>
+
+      <div className="grid two align-start users-layout">
+        <Panel title="Benutzer">
+          {users.error ? <Alert text={users.error} /> : <UsersTable rows={users.data} canManage={canManage} onEdit={selectUser} onDeactivate={deactivate} />}
+        </Panel>
+
+        <Panel title={editing ? "Benutzer bearbeiten" : "Benutzer anlegen"}>
+          <FormMessage message={message} error={error} />
+          {!canManage ? <Alert text="Nur Admins dürfen Benutzer verwalten." /> : (
+            <form className="form-grid single" onSubmit={submit}>
+              <div className="grid two">
+                <Field label="Vorname *"><input required value={form.first_name} onChange={(e) => setForm({ ...form, first_name: e.target.value })} /></Field>
+                <Field label="Nachname *"><input required value={form.last_name} onChange={(e) => setForm({ ...form, last_name: e.target.value })} /></Field>
+              </div>
+              <Field label="E-Mail *"><input required type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} /></Field>
+              <div className="grid two">
+                <Field label="App-Rolle *"><select value={form.app_role} onChange={(e) => setForm({ ...form, app_role: e.target.value })}>{userRoles.map((x) => <option key={x}>{x}</option>)}</select></Field>
+                <Field label="Mitarbeiter-Rolle"><select value={form.employee_role} onChange={(e) => setForm({ ...form, employee_role: e.target.value })}>{employeeRoles.map((x) => <option key={x}>{x}</option>)}</select></Field>
+              </div>
+              <Field label="Funktion"><input value={form.job_title} onChange={(e) => setForm({ ...form, job_title: e.target.value })} /></Field>
+              <Field label="Abteilung"><select value={form.department_id} onChange={(e) => setForm({ ...form, department_id: e.target.value })}><option value="">Nicht zugewiesen</option>{departments.data.map((department) => <option key={department.id} value={department.id}>{department.name}</option>)}</select></Field>
+              <Field label="Vorgesetzter"><select value={form.manager_id} onChange={(e) => setForm({ ...form, manager_id: e.target.value })}><option value="">Kein Vorgesetzter</option>{activeUsers.map((user) => <option key={user.id} value={user.id}>{user.full_name} · {user.department_name || "ohne Abteilung"}</option>)}</select></Field>
+              <label className="toggle"><input type="checkbox" checked={form.is_active} onChange={(e) => setForm({ ...form, is_active: e.target.checked })} /> Aktiv</label>
+              <div className="form-actions"><button className="button" type="submit">Speichern</button><button className="button ghost" type="button" onClick={resetForm}>Neu</button></div>
+            </form>
+          )}
+        </Panel>
+      </div>
+    </div>
+  );
+}
+
+function UsersTable({ rows, canManage, onEdit, onDeactivate }) {
+  if (!rows?.length) return <Empty text="Keine Benutzer gefunden." />;
+  return (
+    <div className="table-wrap">
+      <table>
+        <thead><tr><th>Name</th><th>Rollen</th><th>Abteilung</th><th>Vorgesetzter</th><th>Status</th>{canManage && <th></th>}</tr></thead>
+        <tbody>
+          {rows.map((user) => (
+            <tr key={user.id} className={!user.is_active ? "muted-row" : ""}>
+              <td><strong>{user.full_name}</strong><small>{user.email}{user.job_title ? ` · ${user.job_title}` : ""}</small></td>
+              <td><RoleBadge value={user.app_role} /> <span className="badge neutral">{user.employee_role || "Mitarbeiter"}</span></td>
+              <td>{user.department_name || "-"}</td>
+              <td>{user.manager_name || "-"}</td>
+              <td>{user.is_active ? <span className="badge result-in-ordnung">Aktiv</span> : <span className="badge status-archiviert">Inaktiv</span>}</td>
+              {canManage && <td><div className="row-actions"><button className="icon" title="Bearbeiten" onClick={() => onEdit(user)}><Pencil size={16} /></button><button className="icon danger" title="Deaktivieren" onClick={() => onDeactivate(user.id)}><Trash2 size={16} /></button></div></td>}
+            </tr>
+          ))}
+        </tbody>
+      </table>
     </div>
   );
 }
@@ -502,7 +655,7 @@ function SettingsPage() {
     <div className="grid two align-start">
       <Panel title="Rollen & Zugriff">
         <p className="plain">Aktive MVP-Rolle: <strong>{role}</strong></p>
-        <MiniBars data={{ Admin: role === "Admin" ? 1 : 0, Auditor: role === "Auditor" ? 1 : 0, Viewer: role === "Viewer" ? 1 : 0 }} />
+        <MiniBars data={{ Admin: role === "Admin" ? 1 : 0, Auditor: role === "Auditor" ? 1 : 0, Viewer: role === "Viewer" ? 1 : 0, Mitarbeiter: role === "Mitarbeiter" ? 1 : 0 }} />
       </Panel>
       <Panel title="Produktive Nutzung vorbereitet">
         <ul className="check-list">
@@ -557,6 +710,24 @@ function MiniBars({ data }) {
 
 function Field({ label, children }) {
   return <label className="field"><span>{label}</span>{children}</label>;
+}
+
+function emptyUserForm() {
+  return {
+    first_name: "",
+    last_name: "",
+    email: "",
+    app_role: "Mitarbeiter",
+    employee_role: "Mitarbeiter",
+    job_title: "",
+    department_id: "",
+    manager_id: "",
+    is_active: true
+  };
+}
+
+function RoleBadge({ value }) {
+  return <span className={`badge role-${slug(value)}`}>{value}</span>;
 }
 
 function StatusBadge({ value }) {

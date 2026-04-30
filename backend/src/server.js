@@ -8,6 +8,7 @@ import { departmentsRouter } from "./routes/departments.js";
 import { dashboardRouter } from "./routes/dashboard.js";
 import { auditsRouter } from "./routes/audits.js";
 import { exportRouter } from "./routes/export.js";
+import { usersRouter } from "./routes/users.js";
 
 await initDatabase();
 
@@ -23,6 +24,7 @@ app.get("/api/health", (_req, res) => {
 
 app.use("/api/documents", documentsRouter);
 app.use("/api/departments", departmentsRouter);
+app.use("/api/users", usersRouter);
 app.use("/api/dashboard", dashboardRouter);
 app.use("/api/audits", auditsRouter);
 app.use("/api/export", exportRouter);

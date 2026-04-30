@@ -1,4 +1,4 @@
-import { run, get } from "./database.js";
+import { all, run, get } from "./database.js";
 import { seedDatabase } from "./seed.js";
 
 export async function initDatabase() {
@@ -10,8 +10,30 @@ export async function initDatabase() {
       name TEXT NOT NULL UNIQUE,
       description TEXT,
       responsible_person TEXT,
+      supervisor_user_id INTEGER,
       created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
       updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+    )
+  `);
+
+  await ensureColumn("departments", "supervisor_user_id", "INTEGER");
+
+  await run(`
+    CREATE TABLE IF NOT EXISTS users (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      first_name TEXT NOT NULL,
+      last_name TEXT NOT NULL,
+      email TEXT NOT NULL UNIQUE,
+      app_role TEXT NOT NULL,
+      employee_role TEXT,
+      job_title TEXT,
+      department_id INTEGER,
+      manager_id INTEGER,
+      is_active INTEGER NOT NULL DEFAULT 1,
+      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (department_id) REFERENCES departments(id),
+      FOREIGN KEY (manager_id) REFERENCES users(id)
     )
   `);
 
@@ -55,5 +77,15 @@ export async function initDatabase() {
   const count = await get("SELECT COUNT(*) AS count FROM departments");
   if (!count?.count) {
     await seedDatabase();
+  } else {
+    const userCount = await get("SELECT COUNT(*) AS count FROM users");
+    if (!userCount?.count) await seedDatabase();
+  }
+}
+
+async function ensureColumn(table, column, definition) {
+  const columns = await all(`PRAGMA table_info(${table})`);
+  if (!columns.some((row) => row.name === column)) {
+    await run(`ALTER TABLE ${table} ADD COLUMN ${column} ${definition}`);
   }
 }

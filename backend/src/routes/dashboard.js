@@ -13,6 +13,7 @@ dashboardRouter.get("/stats", async (_req, res, next) => {
     `);
     const currentMonth = todayIso().slice(0, 7);
     const auditsThisMonth = await get("SELECT COUNT(*) AS count FROM audit_logs WHERE substr(audit_date, 1, 7) = ?", [currentMonth]);
+    const activeUsers = await get("SELECT COUNT(*) AS count FROM users WHERE is_active = 1");
 
     const dueCounts = documents.reduce((acc, document) => {
       const state = auditDueState(document.next_audit_date);
@@ -35,6 +36,7 @@ dashboardRouter.get("/stats", async (_req, res, next) => {
       dueAudits: dueCounts["Fällig"] || 0,
       overdueAudits: dueCounts["Überfällig"] || 0,
       auditsThisMonth: auditsThisMonth.count,
+      activeUsers: activeUsers.count,
       byStatus,
       byDepartment
     });

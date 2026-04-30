@@ -60,6 +60,40 @@ exportRouter.get("/audits", async (_req, res, next) => {
   }
 });
 
+exportRouter.get("/users", async (_req, res, next) => {
+  try {
+    const rows = await all(`
+      SELECT
+        u.id,
+        (u.first_name || ' ' || u.last_name) AS full_name,
+        u.email,
+        u.app_role,
+        u.employee_role,
+        u.job_title,
+        dep.name AS department_name,
+        (m.first_name || ' ' || m.last_name) AS manager_name,
+        CASE WHEN u.is_active = 1 THEN 'Aktiv' ELSE 'Inaktiv' END AS status
+      FROM users u
+      LEFT JOIN departments dep ON dep.id = u.department_id
+      LEFT JOIN users m ON m.id = u.manager_id
+      ORDER BY u.last_name, u.first_name
+    `);
+    sendCsv(res, "benutzer.csv", toCsv(rows, [
+      { key: "id", label: "ID" },
+      { key: "full_name", label: "Name" },
+      { key: "email", label: "E-Mail" },
+      { key: "app_role", label: "App-Rolle" },
+      { key: "employee_role", label: "Mitarbeiter-Rolle" },
+      { key: "job_title", label: "Funktion" },
+      { key: "department_name", label: "Abteilung" },
+      { key: "manager_name", label: "Vorgesetzter" },
+      { key: "status", label: "Status" }
+    ]));
+  } catch (error) {
+    next(error);
+  }
+});
+
 exportRouter.get("/documents/:id/audits", async (req, res, next) => {
   try {
     const rows = await all(`
