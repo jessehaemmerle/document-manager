@@ -6,6 +6,7 @@ export const config = {
   port: Number(process.env.PORT || 4000),
   databasePath: process.env.DATABASE_PATH || "./data/document-audits.sqlite",
   clientOrigin: process.env.CLIENT_ORIGIN || "http://localhost:5173",
+  appBaseUrl: (process.env.APP_BASE_URL || process.env.CLIENT_ORIGIN || "http://localhost:5173").replace(/\/$/, ""),
   authSecret: process.env.AUTH_SECRET || "local-dev-change-me",
   mail: {
     host: process.env.MAIL_HOST || "",

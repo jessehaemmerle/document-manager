@@ -24,6 +24,7 @@ Kopiere bei Bedarf `.env.example` nach `.env` und passe Werte an:
 PORT=4000
 DATABASE_PATH=./data/document-audits.sqlite
 CLIENT_ORIGIN=http://localhost:5173
+APP_BASE_URL=http://localhost:5173
 AUTH_SECRET=change-this-for-production
 MAIL_HOST=
 MAIL_PORT=587
@@ -95,6 +96,8 @@ Der Backend-Job prüft automatisch in regelmäßigen Abständen fällige Dokumen
 - am Prüfdatum: Mail an den persönlich zugewiesenen Benutzer, ersatzweise an die Führungskraft der Audit-Abteilung
 - 2 Tage nach Prüfdatum: weitere Mail, wenn der Dokumentstatus seit dem Prüfdatum unverändert ist
 - 5 Tage nach Prüfdatum: Eskalation, wenn der Status weiterhin unverändert ist; diese Mail geht zusätzlich an die Führungskraft
+
+Jede Mail enthält einen direkten Link zur Dokumentdetailseite in der Web-Plattform. Setze dafür `APP_BASE_URL` auf die von den Empfängern erreichbare interne URL der App.
 
 Bereits versendete Stufen werden in `notification_events` gespeichert, damit keine doppelten Mails pro Dokument und Prüfdatum verschickt werden. Admins können den Lauf im Bereich `Admin` manuell starten und die letzten Mailereignisse ansehen.
 

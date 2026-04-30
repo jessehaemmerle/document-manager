@@ -44,6 +44,7 @@ function assignedRecipients(document) {
 }
 
 function buildMail(stage, document, statusSnapshot) {
+  const platformUrl = `${config.appBaseUrl}/documents/${document.id}`;
   const stageLabels = {
     due: "Audit fällig",
     plus_2_same_status: "Audit seit 2 Tagen unverändert",
@@ -57,6 +58,7 @@ function buildMail(stage, document, statusSnapshot) {
     `Status am Prüfdatum: ${statusSnapshot}`,
     `Aktueller Status: ${document.status}`,
     `Zugewiesen an: ${document.assigned_user_name || "Nicht zugewiesen"}`,
+    `Direkt in DocAudit öffnen: ${platformUrl}`,
     `Externer Link: ${document.external_url}`
   ];
   if (stage === "plus_2_same_status") {
@@ -66,7 +68,15 @@ function buildMail(stage, document, statusSnapshot) {
     lines.splice(1, 0, "Das Dokument hat 5 Tage nach dem Prüfdatum weiterhin den gleichen Status. Diese Nachricht geht zusätzlich an die Führungskraft.");
   }
   const text = lines.join("\n");
-  const html = `<p>${lines.map((line) => line.replace(/&/g, "&amp;").replace(/</g, "&lt;")).join("<br>")}</p>`;
+  const html = `
+    <p>${lines.map((line) => line.replace(/&/g, "&amp;").replace(/</g, "&lt;")).join("<br>")}</p>
+    <p>
+      <a href="${platformUrl}" target="_blank" rel="noopener noreferrer"
+         style="display:inline-block;background:#246b68;color:#ffffff;padding:10px 14px;text-decoration:none;border-radius:6px;font-weight:700;">
+        In DocAudit öffnen
+      </a>
+    </p>
+  `;
   return { subject, text, html };
 }
 
