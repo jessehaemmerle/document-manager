@@ -33,6 +33,30 @@ function validateDocument(body) {
   }
 }
 
+async function enforceDocumentWriteScope(req, body, currentDocument = null) {
+  if (req.user.app_role === "Admin") return;
+  if (req.user.app_role !== "Führungskraft") {
+    throw Object.assign(new Error("Keine Berechtigung zum Verwalten von Dokumenten."), { status: 403 });
+  }
+
+  const documentDepartmentId = Number(body.department_id);
+  const auditDepartmentId = Number(body.audit_department_id || body.department_id);
+  if (documentDepartmentId !== Number(req.user.department_id) || auditDepartmentId !== Number(req.user.department_id)) {
+    throw Object.assign(new Error("Führungskräfte dürfen nur Dokumente der eigenen Abteilung verwalten."), { status: 403 });
+  }
+
+  if (currentDocument && !canAccessDocument(req.user, currentDocument)) {
+    throw Object.assign(new Error("Keine Berechtigung für dieses Dokument."), { status: 403 });
+  }
+
+  if (body.assigned_user_id) {
+    const assignedUser = await get("SELECT id FROM users WHERE id = ? AND is_active = 1 AND department_id = ?", [body.assigned_user_id, req.user.department_id]);
+    if (!assignedUser) {
+      throw Object.assign(new Error("Zugewiesener Benutzer muss aktiv und in der eigenen Abteilung sein."), { status: 403 });
+    }
+  }
+}
+
 documentsRouter.get("/", async (req, res, next) => {
   try {
     const filters = [];
@@ -91,9 +115,10 @@ documentsRouter.get("/:id", async (req, res, next) => {
   }
 });
 
-documentsRouter.post("/", requireRole("Admin"), async (req, res, next) => {
+documentsRouter.post("/", requireRole("Admin", "Führungskraft"), async (req, res, next) => {
   try {
     validateDocument(req.body);
+    await enforceDocumentWriteScope(req, req.body);
     const lastAuditDate = req.body.last_audit_date || null;
     const nextAuditDate = req.body.next_audit_date || calculateNextAuditDate(lastAuditDate || todayIso(), req.body.audit_interval_type, req.body.audit_interval_days);
     const result = await run(
@@ -123,11 +148,12 @@ documentsRouter.post("/", requireRole("Admin"), async (req, res, next) => {
   }
 });
 
-documentsRouter.put("/:id", requireRole("Admin"), async (req, res, next) => {
+documentsRouter.put("/:id", requireRole("Admin", "Führungskraft"), async (req, res, next) => {
   try {
     validateDocument(req.body);
     const current = await get("SELECT * FROM documents WHERE id = ?", [req.params.id]);
     if (!current) throw Object.assign(new Error("Dokument nicht gefunden."), { status: 404 });
+    await enforceDocumentWriteScope(req, req.body, current);
     const nextAuditDate = req.body.next_audit_date || calculateNextAuditDate(req.body.last_audit_date || current.last_audit_date || todayIso(), req.body.audit_interval_type, req.body.audit_interval_days);
     await run(
       `UPDATE documents

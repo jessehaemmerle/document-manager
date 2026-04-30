@@ -60,7 +60,7 @@ Die App hat jetzt einen einfachen Login. Seed-Benutzer verwenden im lokalen MVP 
 Nutzergruppen:
 
 - `Admin`: sieht und verwaltet alle Dokumente, Audits, Benutzer und Abteilungen
-- `Führungskraft`: sieht alle fälligen und historischen Audits der eigenen Audit-Abteilung
+- `Führungskraft`: sieht alle fälligen und historischen Audits der eigenen Audit-Abteilung und darf Dokumente für die eigene Abteilung anlegen/bearbeiten
 - `Mitarbeiter`: sieht nur Audits, die ihm persönlich zugewiesen sind
 
 Demo-Logins:

@@ -104,6 +104,7 @@ function App() {
       token,
       role,
       canManage: role === "Admin",
+      canEditDocuments: role === "Admin" || role === "Führungskraft",
       canAudit: Boolean(user),
       login: ({ token: nextToken, user: nextUser }) => {
         localStorage.setItem("authToken", nextToken);
@@ -279,7 +280,7 @@ function Dashboard() {
 }
 
 function DocumentsPage() {
-  const { canManage } = useRole();
+  const { canEditDocuments } = useRole();
   const [filters, setFilters] = useState({ search: "", department_id: "", audit_department_id: "", document_type: "", status: "", due_state: "Alle", sort: "next_audit_date", direction: "asc" });
   const query = new URLSearchParams(Object.entries(filters).filter(([, value]) => value)).toString();
   const docs = useApi(`/documents?${query}`, []);
@@ -293,7 +294,7 @@ function DocumentsPage() {
         </div>
         <div className="actions">
           <button className="button secondary" onClick={() => download("/export/documents")}><Download size={17} /> CSV</button>
-          {canManage && <Link className="button" to="/documents/new"><FilePlus2 size={17} /> Dokument anlegen</Link>}
+          {canEditDocuments && <Link className="button" to="/documents/new"><FilePlus2 size={17} /> Dokument anlegen</Link>}
         </div>
       </div>
       <Panel>
@@ -359,7 +360,7 @@ function DocumentTable({ rows, compact = false }) {
 function DocumentForm() {
   const { id } = useParams();
   const navigate = useNavigate();
-  const { role, canManage } = useRole();
+  const { role, user, canManage, canEditDocuments } = useRole();
   const departments = useApi("/departments", []);
   const users = useApi(canManage ? "/users" : "/auth/me", []);
   const isEdit = Boolean(id);
@@ -392,15 +393,15 @@ function DocumentForm() {
     })).catch((err) => setError(err.message));
   }, [id, isEdit, role]);
 
-  if (!canManage) return <Alert text="Nur Admins dürfen Dokumente anlegen oder bearbeiten." />;
+  if (!canEditDocuments) return <Alert text="Nur Admins und Führungskräfte dürfen Dokumente anlegen oder bearbeiten." />;
 
   const submit = async (event) => {
     event.preventDefault();
     try {
       const payload = {
         ...form,
-        department_id: Number(form.department_id),
-        audit_department_id: form.audit_department_id ? Number(form.audit_department_id) : null,
+        department_id: canManage ? Number(form.department_id) : Number(user.department_id),
+        audit_department_id: canManage ? (form.audit_department_id ? Number(form.audit_department_id) : null) : Number(user.department_id),
         assigned_user_id: form.assigned_user_id ? Number(form.assigned_user_id) : null,
         audit_interval_days: form.audit_interval_days ? Number(form.audit_interval_days) : null
       };
@@ -419,9 +420,9 @@ function DocumentForm() {
         <Field label="Titel *"><input required value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} /></Field>
         <Field label="Externer Link *"><input required value={form.external_url} onChange={(e) => setForm({ ...form, external_url: e.target.value })} /></Field>
         <Field label="Beschreibung"><textarea value={form.description || ""} onChange={(e) => setForm({ ...form, description: e.target.value })} /></Field>
-        <Field label="Abteilung *"><select required value={form.department_id} onChange={(e) => setForm({ ...form, department_id: e.target.value })}><option value="">Bitte wählen</option>{departments.data.map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}</select></Field>
-        <Field label="Audit-Abteilung"><select value={form.audit_department_id || ""} onChange={(e) => setForm({ ...form, audit_department_id: e.target.value })}><option value="">Wie Dokumentabteilung</option>{departments.data.map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}</select></Field>
-        <Field label="Persönlich zugewiesen"><select value={form.assigned_user_id || ""} onChange={(e) => setForm({ ...form, assigned_user_id: e.target.value })}><option value="">Keine persönliche Zuweisung</option>{users.data.filter((user) => user.is_active).map((user) => <option key={user.id} value={user.id}>{user.full_name} · {user.department_name || "ohne Abteilung"}</option>)}</select></Field>
+        <Field label="Abteilung *"><select required disabled={!canManage} value={canManage ? form.department_id : user.department_id || ""} onChange={(e) => setForm({ ...form, department_id: e.target.value })}><option value="">Bitte wählen</option>{departments.data.filter((d) => canManage || Number(d.id) === Number(user.department_id)).map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}</select></Field>
+        <Field label="Audit-Abteilung"><select disabled={!canManage} value={canManage ? (form.audit_department_id || "") : user.department_id || ""} onChange={(e) => setForm({ ...form, audit_department_id: e.target.value })}><option value="">Wie Dokumentabteilung</option>{departments.data.filter((d) => canManage || Number(d.id) === Number(user.department_id)).map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}</select></Field>
+        <Field label="Persönlich zugewiesen"><select value={form.assigned_user_id || ""} onChange={(e) => setForm({ ...form, assigned_user_id: e.target.value })}><option value="">Keine persönliche Zuweisung</option>{users.data.filter((listedUser) => listedUser.is_active && (canManage || Number(listedUser.department_id) === Number(user.department_id))).map((listedUser) => <option key={listedUser.id} value={listedUser.id}>{listedUser.full_name} · {listedUser.department_name || "ohne Abteilung"}</option>)}</select></Field>
         <Field label="Dokumenttyp *"><select value={form.document_type} onChange={(e) => setForm({ ...form, document_type: e.target.value })}>{documentTypes.map((x) => <option key={x}>{x}</option>)}</select></Field>
         <Field label="Status *"><select value={form.status} onChange={(e) => setForm({ ...form, status: e.target.value })}>{statuses.map((x) => <option key={x}>{x}</option>)}</select></Field>
         <Field label="Verantwortliche Person *"><input required value={form.responsible_person} onChange={(e) => setForm({ ...form, responsible_person: e.target.value })} /></Field>
@@ -437,7 +438,7 @@ function DocumentForm() {
 
 function DocumentDetail() {
   const { id } = useParams();
-  const { role, canManage, canAudit } = useRole();
+  const { role, canManage, canEditDocuments, canAudit } = useRole();
   const document = useApi(`/documents/${id}`, null);
   const audits = useApi(`/documents/${id}/audits`, []);
   const [showAudit, setShowAudit] = useState(false);
@@ -464,7 +465,7 @@ function DocumentDetail() {
         <div className="actions">
           <a className="button secondary" href={doc.external_url} target="_blank" rel="noopener noreferrer"><ExternalLink size={17} /> Externe Datei</a>
           {canAudit && <button className="button" onClick={() => setShowAudit(true)}><ClipboardCheck size={17} /> Audit durchführen</button>}
-          {canManage && <Link className="button ghost" to={`/documents/${id}/edit`}><Pencil size={17} /> Bearbeiten</Link>}
+          {canEditDocuments && <Link className="button ghost" to={`/documents/${id}/edit`}><Pencil size={17} /> Bearbeiten</Link>}
           {canManage && <button className="icon danger" title="Archivieren" onClick={archive}><Trash2 size={17} /></button>}
         </div>
       </div>
