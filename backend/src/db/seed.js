@@ -1,5 +1,6 @@
 import { all, run, get } from "./database.js";
 import { addDays, todayIso } from "../utils/dates.js";
+import { hashPassword } from "../utils/passwords.js";
 
 const departments = [
   ["IT", "Systeme, Infrastruktur und digitale Werkzeuge", "Miriam Keller"],
@@ -12,15 +13,15 @@ const departments = [
 
 const users = [
   ["Miriam", "Keller", "miriam.keller@example.com", "Admin", "Vorgesetzter", "IT-Leiterin", "IT", null],
-  ["David", "Rauch", "david.rauch@example.com", "Auditor", "Mitarbeiter", "System Engineer", "IT", "miriam.keller@example.com"],
-  ["Thomas", "Berger", "thomas.berger@example.com", "Auditor", "Vorgesetzter", "Produktionsleiter", "Produktion", null],
+  ["David", "Rauch", "david.rauch@example.com", "Mitarbeiter", "Mitarbeiter", "System Engineer", "IT", "miriam.keller@example.com"],
+  ["Thomas", "Berger", "thomas.berger@example.com", "Führungskraft", "Vorgesetzter", "Produktionsleiter", "Produktion", null],
   ["Lea", "Hartmann", "lea.hartmann@example.com", "Mitarbeiter", "Mitarbeiter", "Schichtkoordination", "Produktion", "thomas.berger@example.com"],
-  ["Anna", "Leitner", "anna.leitner@example.com", "Auditor", "Vorgesetzter", "QS-Leitung", "Qualitätssicherung", null],
-  ["Sophie", "Audit", "sophie.audit@example.com", "Auditor", "Mitarbeiter", "Audit Specialist", "Qualitätssicherung", "anna.leitner@example.com"],
+  ["Anna", "Leitner", "anna.leitner@example.com", "Führungskraft", "Vorgesetzter", "QS-Leitung", "Qualitätssicherung", null],
+  ["Sophie", "Audit", "sophie.audit@example.com", "Mitarbeiter", "Mitarbeiter", "Audit Specialist", "Qualitätssicherung", "anna.leitner@example.com"],
   ["Julia", "Weiss", "julia.weiss@example.com", "Admin", "Vorgesetzter", "Verwaltungsleitung", "Verwaltung", null],
-  ["Markus", "Fink", "markus.fink@example.com", "Mitarbeiter", "Vorgesetzter", "Einkaufsleitung", "Einkauf", null],
-  ["Nina", "Hofer", "nina.hofer@example.com", "Viewer", "Vorgesetzter", "Logistikleitung", "Logistik", null],
-  ["Max", "Pruefer", "max.pruefer@example.com", "Auditor", "Mitarbeiter", "Interner Auditor", "Verwaltung", "julia.weiss@example.com"]
+  ["Markus", "Fink", "markus.fink@example.com", "Führungskraft", "Vorgesetzter", "Einkaufsleitung", "Einkauf", null],
+  ["Nina", "Hofer", "nina.hofer@example.com", "Führungskraft", "Vorgesetzter", "Logistikleitung", "Logistik", null],
+  ["Max", "Pruefer", "max.pruefer@example.com", "Mitarbeiter", "Mitarbeiter", "Interner Auditor", "Verwaltung", "julia.weiss@example.com"]
 ];
 
 const documents = [
@@ -57,11 +58,12 @@ export async function seedDatabase() {
   if (!existingUsers?.count) {
     for (const user of users) {
       const [firstName, lastName, email, appRole, employeeRole, jobTitle, departmentName] = user;
+      const { hash, salt } = hashPassword("demo123");
       const result = await run(
         `INSERT INTO users (
-          first_name, last_name, email, app_role, employee_role, job_title, department_id
-        ) VALUES (?, ?, ?, ?, ?, ?, ?)`,
-        [firstName, lastName, email, appRole, employeeRole, jobTitle, departmentIds.get(departmentName)]
+          first_name, last_name, email, app_role, employee_role, job_title, department_id, password_hash, password_salt
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        [firstName, lastName, email, appRole, employeeRole, jobTitle, departmentIds.get(departmentName), hash, salt]
       );
       userIds.set(email, result.id);
     }
@@ -84,6 +86,9 @@ export async function seedDatabase() {
     for (const [departmentName, email] of supervisors) {
       await run("UPDATE departments SET supervisor_user_id = ? WHERE name = ?", [userIds.get(email), departmentName]);
     }
+  } else {
+    const rows = await all("SELECT id, email FROM users");
+    rows.forEach((user) => userIds.set(user.email, user.id));
   }
 
   const existingDocuments = await get("SELECT COUNT(*) AS count FROM documents");
@@ -91,13 +96,25 @@ export async function seedDatabase() {
 
   const today = todayIso();
   const documentIds = [];
+  const assignedUsers = {
+    "Miriam Keller": "miriam.keller@example.com",
+    "David Rauch": "david.rauch@example.com",
+    "Thomas Berger": "thomas.berger@example.com",
+    "Lea Hartmann": "lea.hartmann@example.com",
+    "Anna Leitner": "anna.leitner@example.com",
+    "Sophie Audit": "sophie.audit@example.com",
+    "Julia Weiss": "julia.weiss@example.com",
+    "Markus Fink": "markus.fink@example.com",
+    "Nina Hofer": "nina.hofer@example.com",
+    "Max Pruefer": "max.pruefer@example.com"
+  };
   for (const doc of documents) {
     const [title, description, externalUrl, type, department, responsible, status, interval, customDays, lastOffset, nextOffset] = doc;
     const result = await run(
       `INSERT INTO documents (
         title, description, external_url, document_type, department_id, responsible_person, status,
-        audit_interval_type, audit_interval_days, last_audit_date, next_audit_date
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        audit_interval_type, audit_interval_days, audit_department_id, assigned_user_id, last_audit_date, next_audit_date
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         title,
         description,
@@ -108,6 +125,8 @@ export async function seedDatabase() {
         status,
         interval,
         customDays,
+        departmentIds.get(department),
+        userIds.get(assignedUsers[responsible]) || null,
         addDays(today, lastOffset),
         addDays(today, nextOffset)
       ]

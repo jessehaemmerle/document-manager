@@ -13,6 +13,7 @@ import {
   Files,
   History,
   LayoutDashboard,
+  LogOut,
   Pencil,
   Search,
   Settings,
@@ -24,25 +25,26 @@ import {
 import "./styles.css";
 
 const API_BASE = "/api";
-const RolesContext = createContext(null);
+const AuthContext = createContext(null);
 
 const documentTypes = ["Richtlinie", "Arbeitsanweisung", "Prozessbeschreibung", "Anleitung", "Formular", "Sonstiges"];
 const statuses = ["Entwurf", "Aktiv", "In Prüfung", "Überarbeitung erforderlich", "Archiviert"];
 const intervals = ["Monatlich", "Quartalsweise", "Halbjährlich", "Jährlich", "Benutzerdefiniert"];
 const dueStates = ["Alle", "Fällig", "Überfällig", "Nicht fällig"];
-const userRoles = ["Admin", "Auditor", "Viewer", "Mitarbeiter"];
+const userRoles = ["Admin", "Führungskraft", "Mitarbeiter"];
 const employeeRoles = ["Vorgesetzter", "Mitarbeiter"];
 
 function useRole() {
-  return useContext(RolesContext);
+  return useContext(AuthContext);
 }
 
-async function api(path, options = {}, role = "Admin") {
+async function api(path, options = {}) {
+  const token = localStorage.getItem("authToken");
   const response = await fetch(`${API_BASE}${path}`, {
     ...options,
     headers: {
       "Content-Type": "application/json",
-      "X-App-Role": role,
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
       ...(options.headers || {})
     }
   });
@@ -54,24 +56,74 @@ async function api(path, options = {}, role = "Admin") {
   return response.json();
 }
 
-function download(path) {
-  window.open(`${API_BASE}${path}`, "_blank", "noopener,noreferrer");
+async function download(path) {
+  const token = localStorage.getItem("authToken");
+  const response = await fetch(`${API_BASE}${path}`, {
+    headers: token ? { Authorization: `Bearer ${token}` } : {}
+  });
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({ error: "Export fehlgeschlagen" }));
+    alert(error.error || "Export fehlgeschlagen");
+    return;
+  }
+  const blob = await response.blob();
+  const disposition = response.headers.get("Content-Disposition") || "";
+  const match = disposition.match(/filename="([^"]+)"/);
+  const link = document.createElement("a");
+  link.href = URL.createObjectURL(blob);
+  link.download = match?.[1] || "export.csv";
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  URL.revokeObjectURL(link.href);
 }
 
 function App() {
-  const [role, setRole] = useState(localStorage.getItem("role") || "Admin");
-  const roleValue = useMemo(() => {
-    const canManage = role === "Admin";
-    const canAudit = role === "Admin" || role === "Auditor";
-    return { role, setRole, canManage, canAudit };
-  }, [role]);
+  const [token, setToken] = useState(localStorage.getItem("authToken") || "");
+  const [user, setUser] = useState(null);
+  const [authLoading, setAuthLoading] = useState(Boolean(token));
 
   useEffect(() => {
-    localStorage.setItem("role", role);
-  }, [role]);
+    if (!token) {
+      setAuthLoading(false);
+      return;
+    }
+    api("/auth/me")
+      .then(setUser)
+      .catch(() => {
+        localStorage.removeItem("authToken");
+        setToken("");
+        setUser(null);
+      })
+      .finally(() => setAuthLoading(false));
+  }, [token]);
+
+  const authValue = useMemo(() => {
+    const role = user?.app_role || "";
+    return {
+      user,
+      token,
+      role,
+      canManage: role === "Admin",
+      canAudit: Boolean(user),
+      login: ({ token: nextToken, user: nextUser }) => {
+        localStorage.setItem("authToken", nextToken);
+        setToken(nextToken);
+        setUser(nextUser);
+      },
+      logout: () => {
+        localStorage.removeItem("authToken");
+        setToken("");
+        setUser(null);
+      }
+    };
+  }, [token, user]);
+
+  if (authLoading) return <Loading />;
+  if (!user) return <AuthContext.Provider value={authValue}><LoginPage /></AuthContext.Provider>;
 
   return (
-    <RolesContext.Provider value={roleValue}>
+    <AuthContext.Provider value={authValue}>
       <BrowserRouter>
         <Shell>
           <Routes>
@@ -88,18 +140,18 @@ function App() {
           </Routes>
         </Shell>
       </BrowserRouter>
-    </RolesContext.Provider>
+    </AuthContext.Provider>
   );
 }
 
 function Shell({ children }) {
-  const { role, setRole } = useRole();
+  const { user, logout, canManage } = useRole();
   const nav = [
     ["/", LayoutDashboard, "Dashboard"],
     ["/documents", Files, "Dokumente"],
     ["/due", BellRing, "Fällige Audits"],
     ["/departments", Building2, "Abteilungen"],
-    ["/users", Users, "Benutzer"],
+    ...(canManage ? [["/users", Users, "Benutzer"]] : []),
     ["/history", History, "Audit-Historie"],
     ["/settings", Settings, "Admin"]
   ];
@@ -126,17 +178,53 @@ function Shell({ children }) {
             <h1>Kontrolle externer Dokumentenlinks</h1>
           </div>
           <label className="role-switch">
-            Rolle
-            <select value={role} onChange={(event) => setRole(event.target.value)}>
-              <option>Admin</option>
-              <option>Auditor</option>
-              <option>Viewer</option>
-              <option>Mitarbeiter</option>
-            </select>
+            Angemeldet
+            <div className="user-chip">
+              <span>{user.full_name}</span>
+              <RoleBadge value={user.app_role} />
+              <button className="icon" title="Abmelden" onClick={logout}><LogOut size={17} /></button>
+            </div>
           </label>
         </header>
         <section className="content">{children}</section>
       </main>
+    </div>
+  );
+}
+
+function LoginPage() {
+  const { login } = useRole();
+  const [form, setForm] = useState({ email: "miriam.keller@example.com", password: "demo123" });
+  const [error, setError] = useState("");
+
+  const submit = async (event) => {
+    event.preventDefault();
+    try {
+      const result = await api("/auth/login", { method: "POST", body: JSON.stringify(form) });
+      login(result);
+    } catch (err) {
+      setError(err.message);
+    }
+  };
+
+  return (
+    <div className="login-screen">
+      <section className="login-panel">
+        <div className="brand login-brand"><ShieldCheck /><span>DocAudit</span></div>
+        <h1>Anmelden</h1>
+        <p>Demo-Passwort für Seed-Benutzer: <strong>demo123</strong></p>
+        <FormMessage error={error} />
+        <form className="form-grid single" onSubmit={submit}>
+          <Field label="E-Mail"><input type="email" required value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} /></Field>
+          <Field label="Passwort"><input type="password" required value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} /></Field>
+          <div className="login-hints">
+            <button type="button" onClick={() => setForm({ email: "miriam.keller@example.com", password: "demo123" })}>Admin</button>
+            <button type="button" onClick={() => setForm({ email: "anna.leitner@example.com", password: "demo123" })}>Führungskraft</button>
+            <button type="button" onClick={() => setForm({ email: "sophie.audit@example.com", password: "demo123" })}>Mitarbeiter</button>
+          </div>
+          <button className="button" type="submit">Einloggen</button>
+        </form>
+      </section>
     </div>
   );
 }
@@ -193,7 +281,7 @@ function Dashboard() {
 
 function DocumentsPage() {
   const { canManage } = useRole();
-  const [filters, setFilters] = useState({ search: "", department_id: "", document_type: "", status: "", due_state: "Alle", sort: "next_audit_date", direction: "asc" });
+  const [filters, setFilters] = useState({ search: "", department_id: "", audit_department_id: "", document_type: "", status: "", due_state: "Alle", sort: "next_audit_date", direction: "asc" });
   const query = new URLSearchParams(Object.entries(filters).filter(([, value]) => value)).toString();
   const docs = useApi(`/documents?${query}`, []);
   const departments = useApi("/departments", []);
@@ -213,6 +301,7 @@ function DocumentsPage() {
         <div className="filters">
           <label className="search-field"><Search size={17} /><input placeholder="Titel oder Beschreibung suchen" value={filters.search} onChange={(e) => setFilters({ ...filters, search: e.target.value })} /></label>
           <select value={filters.department_id} onChange={(e) => setFilters({ ...filters, department_id: e.target.value })}><option value="">Alle Abteilungen</option>{departments.data.map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}</select>
+          <select value={filters.audit_department_id} onChange={(e) => setFilters({ ...filters, audit_department_id: e.target.value })}><option value="">Alle Audit-Abteilungen</option>{departments.data.map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}</select>
           <select value={filters.document_type} onChange={(e) => setFilters({ ...filters, document_type: e.target.value })}><option value="">Alle Typen</option>{documentTypes.map((x) => <option key={x}>{x}</option>)}</select>
           <select value={filters.status} onChange={(e) => setFilters({ ...filters, status: e.target.value })}><option value="">Alle Status</option>{statuses.map((x) => <option key={x}>{x}</option>)}</select>
           <select value={filters.due_state} onChange={(e) => setFilters({ ...filters, due_state: e.target.value })}>{dueStates.map((x) => <option key={x}>{x}</option>)}</select>
@@ -242,6 +331,7 @@ function DocumentTable({ rows, compact = false }) {
             <th>Titel</th>
             {!compact && <th>Typ</th>}
             <th>Abteilung</th>
+            {!compact && <th>Audit</th>}
             <th>Status</th>
             <th>Fälligkeit</th>
             <th>Letztes Audit</th>
@@ -254,6 +344,7 @@ function DocumentTable({ rows, compact = false }) {
               <td><Link className="table-title" to={`/documents/${doc.id}`}>{doc.title}</Link><small>{doc.responsible_person}</small></td>
               {!compact && <td>{doc.document_type}</td>}
               <td>{doc.department_name}</td>
+              {!compact && <td>{doc.audit_department_name || doc.department_name}<small>{doc.assigned_user_name || "Nicht persönlich zugewiesen"}</small></td>}
               <td><StatusBadge value={doc.status} /></td>
               <td><DueBadge value={doc.due_state} /></td>
               <td>{formatDate(doc.last_audit_date)}</td>
@@ -271,6 +362,7 @@ function DocumentForm() {
   const navigate = useNavigate();
   const { role, canManage } = useRole();
   const departments = useApi("/departments", []);
+  const users = useApi(canManage ? "/users" : "/auth/me", []);
   const isEdit = Boolean(id);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
@@ -284,13 +376,21 @@ function DocumentForm() {
     status: "Entwurf",
     audit_interval_type: "Quartalsweise",
     audit_interval_days: "",
+    audit_department_id: "",
+    assigned_user_id: "",
     last_audit_date: "",
     next_audit_date: ""
   });
 
   useEffect(() => {
     if (!isEdit) return;
-    api(`/documents/${id}`, {}, role).then((data) => setForm({ ...data, department_id: String(data.department_id), audit_interval_days: data.audit_interval_days || "" })).catch((err) => setError(err.message));
+    api(`/documents/${id}`, {}, role).then((data) => setForm({
+      ...data,
+      department_id: String(data.department_id),
+      audit_department_id: data.audit_department_id ? String(data.audit_department_id) : "",
+      assigned_user_id: data.assigned_user_id ? String(data.assigned_user_id) : "",
+      audit_interval_days: data.audit_interval_days || ""
+    })).catch((err) => setError(err.message));
   }, [id, isEdit, role]);
 
   if (!canManage) return <Alert text="Nur Admins dürfen Dokumente anlegen oder bearbeiten." />;
@@ -298,7 +398,13 @@ function DocumentForm() {
   const submit = async (event) => {
     event.preventDefault();
     try {
-      const payload = { ...form, department_id: Number(form.department_id), audit_interval_days: form.audit_interval_days ? Number(form.audit_interval_days) : null };
+      const payload = {
+        ...form,
+        department_id: Number(form.department_id),
+        audit_department_id: form.audit_department_id ? Number(form.audit_department_id) : null,
+        assigned_user_id: form.assigned_user_id ? Number(form.assigned_user_id) : null,
+        audit_interval_days: form.audit_interval_days ? Number(form.audit_interval_days) : null
+      };
       const saved = await api(isEdit ? `/documents/${id}` : "/documents", { method: isEdit ? "PUT" : "POST", body: JSON.stringify(payload) }, role);
       setMessage("Dokument wurde gespeichert.");
       navigate(`/documents/${saved.id}`);
@@ -315,6 +421,8 @@ function DocumentForm() {
         <Field label="Externer Link *"><input required value={form.external_url} onChange={(e) => setForm({ ...form, external_url: e.target.value })} /></Field>
         <Field label="Beschreibung"><textarea value={form.description || ""} onChange={(e) => setForm({ ...form, description: e.target.value })} /></Field>
         <Field label="Abteilung *"><select required value={form.department_id} onChange={(e) => setForm({ ...form, department_id: e.target.value })}><option value="">Bitte wählen</option>{departments.data.map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}</select></Field>
+        <Field label="Audit-Abteilung"><select value={form.audit_department_id || ""} onChange={(e) => setForm({ ...form, audit_department_id: e.target.value })}><option value="">Wie Dokumentabteilung</option>{departments.data.map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}</select></Field>
+        <Field label="Persönlich zugewiesen"><select value={form.assigned_user_id || ""} onChange={(e) => setForm({ ...form, assigned_user_id: e.target.value })}><option value="">Keine persönliche Zuweisung</option>{users.data.filter((user) => user.is_active).map((user) => <option key={user.id} value={user.id}>{user.full_name} · {user.department_name || "ohne Abteilung"}</option>)}</select></Field>
         <Field label="Dokumenttyp *"><select value={form.document_type} onChange={(e) => setForm({ ...form, document_type: e.target.value })}>{documentTypes.map((x) => <option key={x}>{x}</option>)}</select></Field>
         <Field label="Status *"><select value={form.status} onChange={(e) => setForm({ ...form, status: e.target.value })}>{statuses.map((x) => <option key={x}>{x}</option>)}</select></Field>
         <Field label="Verantwortliche Person *"><input required value={form.responsible_person} onChange={(e) => setForm({ ...form, responsible_person: e.target.value })} /></Field>
@@ -369,6 +477,8 @@ function DocumentDetail() {
             <dt>Audit-Fälligkeit</dt><dd><DueBadge value={doc.due_state} /></dd>
             <dt>Dokumenttyp</dt><dd>{doc.document_type}</dd>
             <dt>Abteilung</dt><dd>{doc.department_name}</dd>
+            <dt>Audit-Abteilung</dt><dd>{doc.audit_department_name || doc.department_name}</dd>
+            <dt>Zugewiesen an</dt><dd>{doc.assigned_user_name || "Nicht persönlich zugewiesen"}</dd>
             <dt>Verantwortlich</dt><dd>{doc.responsible_person}</dd>
             <dt>Audit-Intervall</dt><dd>{doc.audit_interval_type}{doc.audit_interval_days ? ` (${doc.audit_interval_days} Tage)` : ""}</dd>
           </dl>
@@ -391,8 +501,8 @@ function DocumentDetail() {
 }
 
 function AuditModal({ document, onClose, onSaved, setError }) {
-  const { role } = useRole();
-  const [form, setForm] = useState({ result: "In Ordnung", comment: "", new_status: "", new_next_audit_date: "", auditor_name: "" });
+  const { role, user } = useRole();
+  const [form, setForm] = useState({ result: "In Ordnung", comment: "", new_status: "", new_next_audit_date: "", auditor_name: user?.full_name || "" });
   const submit = async (event) => {
     event.preventDefault();
     try {
@@ -438,7 +548,7 @@ function DueAudits() {
 function Departments() {
   const { role, canManage } = useRole();
   const departments = useApi("/departments", []);
-  const users = useApi("/users", []);
+  const users = useApi(canManage ? "/users" : "/auth/me", []);
   const [form, setForm] = useState({ name: "", description: "", responsible_person: "", supervisor_user_id: "" });
   const [editing, setEditing] = useState(null);
   const [error, setError] = useState("");
@@ -558,6 +668,7 @@ function UsersPage() {
       job_title: user.job_title || "",
       department_id: user.department_id || "",
       manager_id: user.manager_id || "",
+      password: "",
       is_active: Boolean(user.is_active)
     });
   };
@@ -596,6 +707,7 @@ function UsersPage() {
                 <Field label="Nachname *"><input required value={form.last_name} onChange={(e) => setForm({ ...form, last_name: e.target.value })} /></Field>
               </div>
               <Field label="E-Mail *"><input required type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} /></Field>
+              <Field label={editing ? "Neues Passwort" : "Passwort *"}><input type="password" required={!editing} value={form.password || ""} onChange={(e) => setForm({ ...form, password: e.target.value })} /></Field>
               <div className="grid two">
                 <Field label="App-Rolle *"><select value={form.app_role} onChange={(e) => setForm({ ...form, app_role: e.target.value })}>{userRoles.map((x) => <option key={x}>{x}</option>)}</select></Field>
                 <Field label="Mitarbeiter-Rolle"><select value={form.employee_role} onChange={(e) => setForm({ ...form, employee_role: e.target.value })}>{employeeRoles.map((x) => <option key={x}>{x}</option>)}</select></Field>
@@ -655,12 +767,12 @@ function SettingsPage() {
     <div className="grid two align-start">
       <Panel title="Rollen & Zugriff">
         <p className="plain">Aktive MVP-Rolle: <strong>{role}</strong></p>
-        <MiniBars data={{ Admin: role === "Admin" ? 1 : 0, Auditor: role === "Auditor" ? 1 : 0, Viewer: role === "Viewer" ? 1 : 0, Mitarbeiter: role === "Mitarbeiter" ? 1 : 0 }} />
+        <MiniBars data={{ Admin: role === "Admin" ? 1 : 0, Führungskraft: role === "Führungskraft" ? 1 : 0, Mitarbeiter: role === "Mitarbeiter" ? 1 : 0 }} />
       </Panel>
       <Panel title="Produktive Nutzung vorbereitet">
         <ul className="check-list">
           <li>Umgebungsvariablen für Port, Datenbank und Mailkonfiguration</li>
-          <li>Rollenheader als Vorbereitung für echtes Login</li>
+          <li>Einfacher Login mit Token als Vorbereitung für zentrale Authentifizierung</li>
           <li>Archivieren statt hartem Löschen von Dokumenten</li>
           <li>CSV-Exports für Dokumente und Audit-Historie</li>
           <li>Service-Platzhalter für spätere Mailbenachrichtigung</li>
@@ -722,24 +834,25 @@ function emptyUserForm() {
     job_title: "",
     department_id: "",
     manager_id: "",
+    password: "",
     is_active: true
   };
 }
 
 function RoleBadge({ value }) {
-  return <span className={`badge role-${slug(value)}`}>{value}</span>;
+  return <span className={`badge role-${slugSafe(value)}`}>{value}</span>;
 }
 
 function StatusBadge({ value }) {
-  return <span className={`badge status-${slug(value)}`}>{value}</span>;
+  return <span className={`badge status-${slugSafe(value)}`}>{value}</span>;
 }
 
 function DueBadge({ value }) {
-  return <span className={`badge due-${slug(value)}`}>{value}</span>;
+  return <span className={`badge due-${slugSafe(value)}`}>{value}</span>;
 }
 
 function ResultBadge({ value }) {
-  return <span className={`badge result-${slug(value)}`}>{value}</span>;
+  return <span className={`badge result-${slugSafe(value)}`}>{value}</span>;
 }
 
 function FormMessage({ message, error }) {
@@ -770,6 +883,16 @@ function formatDateTime(value) {
 
 function slug(value = "") {
   return value.toLowerCase().replaceAll(" ", "-").replaceAll("ü", "ue").replaceAll("ä", "ae").replaceAll("ö", "oe");
+}
+
+function slugSafe(value = "") {
+  return value
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replaceAll("ß", "ss")
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-|-$/g, "");
 }
 
 createRoot(document.getElementById("root")).render(<App />);

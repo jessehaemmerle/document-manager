@@ -1,5 +1,6 @@
 import { Router } from "express";
 import { all } from "../db/database.js";
+import { addDocumentAccessFilter, requireRole } from "../middleware/roles.js";
 import { sendCsv, toCsv } from "../utils/csv.js";
 import { auditDueState } from "../utils/dates.js";
 
@@ -19,14 +20,24 @@ const auditColumns = [
   { key: "new_next_audit_date", label: "Neues nächstes Prüfdatum" }
 ];
 
-exportRouter.get("/documents", async (_req, res, next) => {
+exportRouter.get("/documents", async (req, res, next) => {
   try {
+    const filters = [];
+    const params = [];
+    addDocumentAccessFilter(req, filters, params);
     const rows = await all(`
-      SELECT d.*, dep.name AS department_name
+      SELECT
+        d.*,
+        dep.name AS department_name,
+        audit_dep.name AS audit_department_name,
+        (assigned.first_name || ' ' || assigned.last_name) AS assigned_user_name
       FROM documents d
       JOIN departments dep ON dep.id = d.department_id
+      LEFT JOIN departments audit_dep ON audit_dep.id = COALESCE(d.audit_department_id, d.department_id)
+      LEFT JOIN users assigned ON assigned.id = d.assigned_user_id
+      ${filters.length ? `WHERE ${filters.join(" AND ")}` : ""}
       ORDER BY d.title
-    `);
+    `, params);
     const csv = toCsv(rows.map((row) => ({ ...row, due_state: auditDueState(row.next_audit_date) })), [
       { key: "id", label: "ID" },
       { key: "title", label: "Titel" },
@@ -34,6 +45,8 @@ exportRouter.get("/documents", async (_req, res, next) => {
       { key: "external_url", label: "Externer Link" },
       { key: "document_type", label: "Dokumenttyp" },
       { key: "department_name", label: "Abteilung" },
+      { key: "audit_department_name", label: "Audit-Abteilung" },
+      { key: "assigned_user_name", label: "Zugewiesen an" },
       { key: "responsible_person", label: "Verantwortlich" },
       { key: "status", label: "Status" },
       { key: "due_state", label: "Audit-Fälligkeit" },
@@ -46,21 +59,25 @@ exportRouter.get("/documents", async (_req, res, next) => {
   }
 });
 
-exportRouter.get("/audits", async (_req, res, next) => {
+exportRouter.get("/audits", async (req, res, next) => {
   try {
+    const filters = [];
+    const params = [];
+    addDocumentAccessFilter(req, filters, params);
     const rows = await all(`
       SELECT a.*, d.title AS document_title
       FROM audit_logs a
       JOIN documents d ON d.id = a.document_id
+      ${filters.length ? `WHERE ${filters.join(" AND ")}` : ""}
       ORDER BY a.audit_date DESC
-    `);
+    `, params);
     sendCsv(res, "audit-historie.csv", toCsv(rows, auditColumns));
   } catch (error) {
     next(error);
   }
 });
 
-exportRouter.get("/users", async (_req, res, next) => {
+exportRouter.get("/users", requireRole("Admin"), async (_req, res, next) => {
   try {
     const rows = await all(`
       SELECT
@@ -96,13 +113,16 @@ exportRouter.get("/users", async (_req, res, next) => {
 
 exportRouter.get("/documents/:id/audits", async (req, res, next) => {
   try {
+    const filters = ["a.document_id = ?"];
+    const params = [req.params.id];
+    addDocumentAccessFilter(req, filters, params);
     const rows = await all(`
       SELECT a.*, d.title AS document_title
       FROM audit_logs a
       JOIN documents d ON d.id = a.document_id
-      WHERE a.document_id = ?
+      WHERE ${filters.join(" AND ")}
       ORDER BY a.audit_date DESC
-    `, [req.params.id]);
+    `, params);
     sendCsv(res, `audit-historie-dokument-${req.params.id}.csv`, toCsv(rows, auditColumns));
   } catch (error) {
     next(error);

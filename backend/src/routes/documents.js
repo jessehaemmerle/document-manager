@@ -1,15 +1,21 @@
 import { Router } from "express";
 import { all, get, run } from "../db/database.js";
-import { requireRole } from "../middleware/roles.js";
+import { addDocumentAccessFilter, canAccessDocument, requireRole } from "../middleware/roles.js";
 import { auditDueState, calculateNextAuditDate, todayIso } from "../utils/dates.js";
 import { assertOneOf, assertUrl, auditResults, documentTypes, intervals, requireFields, statuses } from "../utils/validation.js";
 
 export const documentsRouter = Router();
 
 const baseSelect = `
-  SELECT d.*, dep.name AS department_name
+  SELECT
+    d.*,
+    dep.name AS department_name,
+    audit_dep.name AS audit_department_name,
+    (assigned.first_name || ' ' || assigned.last_name) AS assigned_user_name
   FROM documents d
   JOIN departments dep ON dep.id = d.department_id
+  LEFT JOIN departments audit_dep ON audit_dep.id = COALESCE(d.audit_department_id, d.department_id)
+  LEFT JOIN users assigned ON assigned.id = d.assigned_user_id
 `;
 
 function withDueState(row) {
@@ -47,6 +53,15 @@ documentsRouter.get("/", async (req, res, next) => {
       filters.push("d.status = ?");
       params.push(req.query.status);
     }
+    if (req.query.audit_department_id) {
+      filters.push("COALESCE(d.audit_department_id, d.department_id) = ?");
+      params.push(req.query.audit_department_id);
+    }
+    if (req.query.assigned_user_id) {
+      filters.push("d.assigned_user_id = ?");
+      params.push(req.query.assigned_user_id);
+    }
+    addDocumentAccessFilter(req, filters, params);
 
     const sortMap = {
       title: "d.title",
@@ -69,6 +84,7 @@ documentsRouter.get("/:id", async (req, res, next) => {
   try {
     const row = await get(`${baseSelect} WHERE d.id = ?`, [req.params.id]);
     if (!row) throw Object.assign(new Error("Dokument nicht gefunden."), { status: 404 });
+    if (!canAccessDocument(req.user, row)) throw Object.assign(new Error("Keine Berechtigung für dieses Audit."), { status: 403 });
     res.json(withDueState(row));
   } catch (error) {
     next(error);
@@ -83,8 +99,8 @@ documentsRouter.post("/", requireRole("Admin"), async (req, res, next) => {
     const result = await run(
       `INSERT INTO documents (
         title, description, external_url, document_type, department_id, responsible_person, status,
-        audit_interval_type, audit_interval_days, last_audit_date, next_audit_date
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        audit_interval_type, audit_interval_days, audit_department_id, assigned_user_id, last_audit_date, next_audit_date
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         req.body.title,
         req.body.description || "",
@@ -95,6 +111,8 @@ documentsRouter.post("/", requireRole("Admin"), async (req, res, next) => {
         req.body.status,
         req.body.audit_interval_type,
         req.body.audit_interval_type === "Benutzerdefiniert" ? req.body.audit_interval_days : null,
+        req.body.audit_department_id || req.body.department_id,
+        req.body.assigned_user_id || null,
         lastAuditDate,
         nextAuditDate
       ]
@@ -115,7 +133,7 @@ documentsRouter.put("/:id", requireRole("Admin"), async (req, res, next) => {
       `UPDATE documents
        SET title = ?, description = ?, external_url = ?, document_type = ?, department_id = ?,
            responsible_person = ?, status = ?, audit_interval_type = ?, audit_interval_days = ?,
-           last_audit_date = ?, next_audit_date = ?, updated_at = CURRENT_TIMESTAMP
+           audit_department_id = ?, assigned_user_id = ?, last_audit_date = ?, next_audit_date = ?, updated_at = CURRENT_TIMESTAMP
        WHERE id = ?`,
       [
         req.body.title,
@@ -127,6 +145,8 @@ documentsRouter.put("/:id", requireRole("Admin"), async (req, res, next) => {
         req.body.status,
         req.body.audit_interval_type,
         req.body.audit_interval_type === "Benutzerdefiniert" ? req.body.audit_interval_days : null,
+        req.body.audit_department_id || req.body.department_id,
+        req.body.assigned_user_id || null,
         req.body.last_audit_date || null,
         nextAuditDate,
         req.params.id
@@ -149,13 +169,16 @@ documentsRouter.delete("/:id", requireRole("Admin"), async (req, res, next) => {
 
 documentsRouter.get("/:id/audits", async (req, res, next) => {
   try {
+    const document = await get("SELECT * FROM documents WHERE id = ?", [req.params.id]);
+    if (!document) throw Object.assign(new Error("Dokument nicht gefunden."), { status: 404 });
+    if (!canAccessDocument(req.user, document)) throw Object.assign(new Error("Keine Berechtigung für dieses Audit."), { status: 403 });
     res.json(await all("SELECT * FROM audit_logs WHERE document_id = ? ORDER BY audit_date DESC, id DESC", [req.params.id]));
   } catch (error) {
     next(error);
   }
 });
 
-documentsRouter.post("/:id/audits", requireRole("Admin", "Auditor"), async (req, res, next) => {
+documentsRouter.post("/:id/audits", async (req, res, next) => {
   try {
     requireFields(req.body, ["auditor_name", "result"]);
     assertOneOf(req.body.result, auditResults, "Prüfergebnis");
@@ -163,6 +186,7 @@ documentsRouter.post("/:id/audits", requireRole("Admin", "Auditor"), async (req,
 
     const document = await get("SELECT * FROM documents WHERE id = ?", [req.params.id]);
     if (!document) throw Object.assign(new Error("Dokument nicht gefunden."), { status: 404 });
+    if (!canAccessDocument(req.user, document)) throw Object.assign(new Error("Keine Berechtigung für dieses Audit."), { status: 403 });
 
     const auditDate = todayIso();
     const newStatus = req.body.new_status || document.status;

@@ -1,13 +1,25 @@
 import { Router } from "express";
 import { all, get, run } from "../db/database.js";
 import { requireRole } from "../middleware/roles.js";
+import { hashPassword } from "../utils/passwords.js";
 import { assertEmail, assertOneOf, requireFields, userRoles } from "../utils/validation.js";
 
 export const usersRouter = Router();
 
 const userSelect = `
   SELECT
-    u.*,
+    u.id,
+    u.first_name,
+    u.last_name,
+    u.email,
+    u.app_role,
+    u.employee_role,
+    u.job_title,
+    u.department_id,
+    u.manager_id,
+    u.is_active,
+    u.created_at,
+    u.updated_at,
     (u.first_name || ' ' || u.last_name) AS full_name,
     dep.name AS department_name,
     (m.first_name || ' ' || m.last_name) AS manager_name
@@ -33,7 +45,7 @@ function normalizeUser(body) {
   };
 }
 
-usersRouter.get("/", async (req, res, next) => {
+usersRouter.get("/", requireRole("Admin"), async (req, res, next) => {
   try {
     const filters = [];
     const params = [];
@@ -56,7 +68,7 @@ usersRouter.get("/", async (req, res, next) => {
   }
 });
 
-usersRouter.get("/:id", async (req, res, next) => {
+usersRouter.get("/:id", requireRole("Admin"), async (req, res, next) => {
   try {
     const user = await get(`${userSelect} WHERE u.id = ?`, [req.params.id]);
     if (!user) throw Object.assign(new Error("Benutzer nicht gefunden."), { status: 404 });
@@ -69,11 +81,13 @@ usersRouter.get("/:id", async (req, res, next) => {
 usersRouter.post("/", requireRole("Admin"), async (req, res, next) => {
   try {
     const user = normalizeUser(req.body);
+    requireFields(req.body, ["password"]);
+    const { hash, salt } = hashPassword(req.body.password);
     const result = await run(
       `INSERT INTO users (
-        first_name, last_name, email, app_role, employee_role, job_title, department_id, manager_id, is_active
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      [user.first_name, user.last_name, user.email, user.app_role, user.employee_role, user.job_title, user.department_id, user.manager_id, user.is_active]
+        first_name, last_name, email, app_role, employee_role, job_title, department_id, manager_id, password_hash, password_salt, is_active
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [user.first_name, user.last_name, user.email, user.app_role, user.employee_role, user.job_title, user.department_id, user.manager_id, hash, salt, user.is_active]
     );
     res.status(201).json(await get(`${userSelect} WHERE u.id = ?`, [result.id]));
   } catch (error) {
@@ -87,12 +101,18 @@ usersRouter.put("/:id", requireRole("Admin"), async (req, res, next) => {
     if (Number(req.params.id) === Number(user.manager_id)) {
       throw Object.assign(new Error("Ein Benutzer kann nicht sein eigener Vorgesetzter sein."), { status: 400 });
     }
+    const passwordUpdate = req.body.password ? ", password_hash = ?, password_salt = ?" : "";
+    const passwordParams = [];
+    if (req.body.password) {
+      const { hash, salt } = hashPassword(req.body.password);
+      passwordParams.push(hash, salt);
+    }
     await run(
       `UPDATE users
        SET first_name = ?, last_name = ?, email = ?, app_role = ?, employee_role = ?, job_title = ?,
-           department_id = ?, manager_id = ?, is_active = ?, updated_at = CURRENT_TIMESTAMP
+           department_id = ?, manager_id = ?, is_active = ?${passwordUpdate}, updated_at = CURRENT_TIMESTAMP
        WHERE id = ?`,
-      [user.first_name, user.last_name, user.email, user.app_role, user.employee_role, user.job_title, user.department_id, user.manager_id, user.is_active, req.params.id]
+      [user.first_name, user.last_name, user.email, user.app_role, user.employee_role, user.job_title, user.department_id, user.manager_id, user.is_active, ...passwordParams, req.params.id]
     );
     res.json(await get(`${userSelect} WHERE u.id = ?`, [req.params.id]));
   } catch (error) {

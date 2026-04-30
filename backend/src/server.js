@@ -9,6 +9,8 @@ import { dashboardRouter } from "./routes/dashboard.js";
 import { auditsRouter } from "./routes/audits.js";
 import { exportRouter } from "./routes/export.js";
 import { usersRouter } from "./routes/users.js";
+import { authRouter } from "./routes/auth.js";
+import { authenticate, requireAuth } from "./middleware/roles.js";
 
 await initDatabase();
 
@@ -22,6 +24,9 @@ app.get("/api/health", (_req, res) => {
   res.json({ ok: true });
 });
 
+app.use("/api/auth", authRouter);
+app.use(authenticate);
+app.use("/api", requireAuth);
 app.use("/api/documents", documentsRouter);
 app.use("/api/departments", departmentsRouter);
 app.use("/api/users", usersRouter);

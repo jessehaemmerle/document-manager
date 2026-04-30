@@ -54,9 +54,21 @@ departmentsRouter.put("/:id", requireRole("Admin"), async (req, res, next) => {
 
 departmentsRouter.get("/:id/users", async (req, res, next) => {
   try {
+    if (req.user.app_role !== "Admin" && Number(req.user.department_id) !== Number(req.params.id)) {
+      throw Object.assign(new Error("Keine Berechtigung für diese Abteilung."), { status: 403 });
+    }
     res.json(await all(`
       SELECT
-        u.*,
+        u.id,
+        u.first_name,
+        u.last_name,
+        u.email,
+        u.app_role,
+        u.employee_role,
+        u.job_title,
+        u.department_id,
+        u.manager_id,
+        u.is_active,
         (u.first_name || ' ' || u.last_name) AS full_name,
         (m.first_name || ' ' || m.last_name) AS manager_name
       FROM users u

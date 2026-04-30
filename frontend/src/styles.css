@@ -150,7 +150,7 @@ main {
 
 .stats-grid {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
   gap: 16px;
 }
 
@@ -284,7 +284,7 @@ textarea {
 
 .filters {
   display: grid;
-  grid-template-columns: 1.7fr repeat(5, minmax(130px, 1fr));
+  grid-template-columns: minmax(220px, 1.7fr) repeat(auto-fit, minmax(140px, 1fr));
   gap: 10px;
 }
 
@@ -395,6 +395,11 @@ td small {
   color: var(--blue);
 }
 
+.role-fuhrungskraft {
+  background: #eef6e8;
+  color: #4d7c0f;
+}
+
 .bars {
   display: grid;
   gap: 12px;
@@ -490,6 +495,59 @@ td small {
 
 .toggle input {
   width: auto;
+}
+
+.user-chip {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.login-screen {
+  display: grid;
+  min-height: 100vh;
+  place-items: center;
+  padding: 24px;
+  background: #eef3f7;
+}
+
+.login-panel {
+  width: min(440px, 100%);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: white;
+  padding: 28px;
+  box-shadow: 0 24px 70px rgba(26, 50, 74, 0.12);
+}
+
+.login-brand {
+  margin-bottom: 18px;
+  color: var(--brand-dark);
+}
+
+.login-panel h1 {
+  margin: 0;
+}
+
+.login-panel p {
+  margin: 8px 0 18px;
+  color: var(--muted);
+}
+
+.login-hints {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.login-hints button {
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: #f6f8fb;
+  color: var(--ink);
+  padding: 7px 10px;
+  cursor: pointer;
 }
 
 .alert,

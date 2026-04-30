@@ -2,7 +2,7 @@ export const documentTypes = ["Richtlinie", "Arbeitsanweisung", "Prozessbeschrei
 export const statuses = ["Entwurf", "Aktiv", "In Prüfung", "Überarbeitung erforderlich", "Archiviert"];
 export const intervals = ["Monatlich", "Quartalsweise", "Halbjährlich", "Jährlich", "Benutzerdefiniert"];
 export const auditResults = ["In Ordnung", "Anpassung erforderlich", "Nicht mehr relevant"];
-export const userRoles = ["Admin", "Auditor", "Viewer", "Mitarbeiter"];
+export const userRoles = ["Admin", "Führungskraft", "Mitarbeiter"];
 
 export function requireFields(body, fields) {
   const missing = fields.filter((field) => body[field] === undefined || body[field] === null || body[field] === "");
