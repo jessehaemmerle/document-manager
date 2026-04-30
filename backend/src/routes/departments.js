@@ -69,8 +69,10 @@ departmentsRouter.get("/:id/users", async (req, res, next) => {
         u.manager_id,
         u.is_active,
         (u.first_name || ' ' || u.last_name) AS full_name,
+        dep.name AS department_name,
         (m.first_name || ' ' || m.last_name) AS manager_name
       FROM users u
+      LEFT JOIN departments dep ON dep.id = u.department_id
       LEFT JOIN users m ON m.id = u.manager_id
       WHERE u.department_id = ?
       ORDER BY u.is_active DESC, u.last_name, u.first_name

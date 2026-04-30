@@ -235,6 +235,12 @@ function useApi(path, fallback) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const refresh = async () => {
+    if (!path) {
+      setData(fallback);
+      setLoading(false);
+      setError("");
+      return;
+    }
     try {
       setLoading(true);
       setData(await api(path, {}, role));
@@ -362,7 +368,7 @@ function DocumentForm() {
   const navigate = useNavigate();
   const { role, user, canManage, canEditDocuments } = useRole();
   const departments = useApi("/departments", []);
-  const users = useApi(canManage ? "/users" : "/auth/me", []);
+  const users = useApi(canManage ? "/users" : user?.department_id ? `/departments/${user.department_id}/users` : null, []);
   const isEdit = Boolean(id);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
@@ -548,7 +554,7 @@ function DueAudits() {
 function Departments() {
   const { role, canManage } = useRole();
   const departments = useApi("/departments", []);
-  const users = useApi(canManage ? "/users" : "/auth/me", []);
+  const users = useApi(canManage ? "/users" : null, []);
   const [form, setForm] = useState({ name: "", description: "", responsible_person: "", supervisor_user_id: "" });
   const [editing, setEditing] = useState(null);
   const [error, setError] = useState("");
@@ -837,7 +843,7 @@ function AuditHistory() {
 
 function SettingsPage() {
   const { role, canManage } = useRole();
-  const events = useApi(canManage ? "/notifications/events" : "/auth/me", []);
+  const events = useApi(canManage ? "/notifications/events" : null, []);
   const [notificationResult, setNotificationResult] = useState("");
   const runNotifications = async () => {
     try {
