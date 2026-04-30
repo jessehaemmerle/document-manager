@@ -13,7 +13,6 @@ const userSelect = `
     u.last_name,
     u.email,
     u.app_role,
-    u.employee_role,
     u.job_title,
     u.department_id,
     u.manager_id,
@@ -37,7 +36,6 @@ function normalizeUser(body) {
     last_name: body.last_name.trim(),
     email: body.email.trim().toLowerCase(),
     app_role: body.app_role,
-    employee_role: body.employee_role || "Mitarbeiter",
     job_title: body.job_title || "",
     department_id: body.department_id || null,
     manager_id: body.manager_id || null,
@@ -107,9 +105,9 @@ usersRouter.post("/", requireRole("Admin"), async (req, res, next) => {
     const { hash, salt } = hashPassword(req.body.password);
     const result = await run(
       `INSERT INTO users (
-        first_name, last_name, email, app_role, employee_role, job_title, department_id, manager_id, password_hash, password_salt, is_active
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      [user.first_name, user.last_name, user.email, user.app_role, user.employee_role, user.job_title, user.department_id, user.manager_id, hash, salt, user.is_active]
+        first_name, last_name, email, app_role, job_title, department_id, manager_id, password_hash, password_salt, is_active
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [user.first_name, user.last_name, user.email, user.app_role, user.job_title, user.department_id, user.manager_id, hash, salt, user.is_active]
     );
     res.status(201).json(await get(`${userSelect} WHERE u.id = ?`, [result.id]));
   } catch (error) {
@@ -131,10 +129,10 @@ usersRouter.put("/:id", requireRole("Admin"), async (req, res, next) => {
     }
     await run(
       `UPDATE users
-       SET first_name = ?, last_name = ?, email = ?, app_role = ?, employee_role = ?, job_title = ?,
+       SET first_name = ?, last_name = ?, email = ?, app_role = ?, job_title = ?,
            department_id = ?, manager_id = ?, is_active = ?${passwordUpdate}, updated_at = CURRENT_TIMESTAMP
        WHERE id = ?`,
-      [user.first_name, user.last_name, user.email, user.app_role, user.employee_role, user.job_title, user.department_id, user.manager_id, user.is_active, ...passwordParams, req.params.id]
+      [user.first_name, user.last_name, user.email, user.app_role, user.job_title, user.department_id, user.manager_id, user.is_active, ...passwordParams, req.params.id]
     );
     res.json(await get(`${userSelect} WHERE u.id = ?`, [req.params.id]));
   } catch (error) {

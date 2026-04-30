@@ -32,7 +32,6 @@ const statuses = ["Entwurf", "Aktiv", "In Prüfung", "Überarbeitung erforderlic
 const intervals = ["Monatlich", "Quartalsweise", "Halbjährlich", "Jährlich", "Benutzerdefiniert"];
 const dueStates = ["Alle", "Fällig", "Überfällig", "Nicht fällig"];
 const userRoles = ["Admin", "Führungskraft", "Mitarbeiter"];
-const employeeRoles = ["Vorgesetzter", "Mitarbeiter"];
 
 function useRole() {
   return useContext(AuthContext);
@@ -692,7 +691,6 @@ function UsersPage() {
       last_name: user.last_name,
       email: user.email,
       app_role: user.app_role,
-      employee_role: user.employee_role || "Mitarbeiter",
       job_title: user.job_title || "",
       department_id: user.department_id || "",
       manager_id: user.manager_id || "",
@@ -737,10 +735,9 @@ function UsersPage() {
               <Field label="E-Mail *"><input required type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} /></Field>
               <Field label={editing ? "Neues Passwort" : "Passwort *"}><input type="password" required={!editing} value={form.password || ""} onChange={(e) => setForm({ ...form, password: e.target.value })} /></Field>
               <div className="grid two">
-                <Field label="App-Rolle *"><select value={form.app_role} onChange={(e) => setForm({ ...form, app_role: e.target.value })}>{userRoles.map((x) => <option key={x}>{x}</option>)}</select></Field>
-                <Field label="Mitarbeiter-Rolle"><select value={form.employee_role} onChange={(e) => setForm({ ...form, employee_role: e.target.value })}>{employeeRoles.map((x) => <option key={x}>{x}</option>)}</select></Field>
+                <Field label="Rolle *"><select value={form.app_role} onChange={(e) => setForm({ ...form, app_role: e.target.value })}>{userRoles.map((x) => <option key={x}>{x}</option>)}</select></Field>
+                <Field label="Funktion"><input value={form.job_title} onChange={(e) => setForm({ ...form, job_title: e.target.value })} /></Field>
               </div>
-              <Field label="Funktion"><input value={form.job_title} onChange={(e) => setForm({ ...form, job_title: e.target.value })} /></Field>
               <Field label="Abteilung"><select value={form.department_id} onChange={(e) => setForm({ ...form, department_id: e.target.value })}><option value="">Nicht zugewiesen</option>{departments.data.map((department) => <option key={department.id} value={department.id}>{department.name}</option>)}</select></Field>
               <Field label="Vorgesetzter"><select value={form.manager_id} onChange={(e) => setForm({ ...form, manager_id: e.target.value })}><option value="">Kein Vorgesetzter</option>{activeUsers.map((user) => <option key={user.id} value={user.id}>{user.full_name} · {user.department_name || "ohne Abteilung"}</option>)}</select></Field>
               <label className="toggle"><input type="checkbox" checked={form.is_active} onChange={(e) => setForm({ ...form, is_active: e.target.checked })} /> Aktiv</label>
@@ -806,12 +803,12 @@ function UsersTable({ rows, canManage, onEdit, onDeactivate }) {
   return (
     <div className="table-wrap">
       <table>
-        <thead><tr><th>Name</th><th>Rollen</th><th>Abteilung</th><th>Vorgesetzter</th><th>Status</th>{canManage && <th></th>}</tr></thead>
+        <thead><tr><th>Name</th><th>Rolle</th><th>Abteilung</th><th>Vorgesetzter</th><th>Status</th>{canManage && <th></th>}</tr></thead>
         <tbody>
           {rows.map((user) => (
             <tr key={user.id} className={!user.is_active ? "muted-row" : ""}>
               <td><strong>{user.full_name}</strong><small>{user.email}{user.job_title ? ` · ${user.job_title}` : ""}</small></td>
-              <td><RoleBadge value={user.app_role} /> <span className="badge neutral">{user.employee_role || "Mitarbeiter"}</span></td>
+              <td><RoleBadge value={user.app_role} /></td>
               <td>{user.department_name || "-"}</td>
               <td>{user.manager_name || "-"}</td>
               <td>{user.is_active ? <span className="badge result-in-ordnung">Aktiv</span> : <span className="badge status-archiviert">Inaktiv</span>}</td>
@@ -906,7 +903,6 @@ function emptyUserForm() {
     last_name: "",
     email: "",
     app_role: "Mitarbeiter",
-    employee_role: "Mitarbeiter",
     job_title: "",
     department_id: "",
     manager_id: "",

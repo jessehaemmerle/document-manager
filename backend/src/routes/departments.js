@@ -64,7 +64,6 @@ departmentsRouter.get("/:id/users", async (req, res, next) => {
         u.last_name,
         u.email,
         u.app_role,
-        u.employee_role,
         u.job_title,
         u.department_id,
         u.manager_id,

@@ -12,16 +12,16 @@ const departments = [
 ];
 
 const users = [
-  ["Miriam", "Keller", "miriam.keller@example.com", "Admin", "Vorgesetzter", "IT-Leiterin", "IT", null],
-  ["David", "Rauch", "david.rauch@example.com", "Mitarbeiter", "Mitarbeiter", "System Engineer", "IT", "miriam.keller@example.com"],
-  ["Thomas", "Berger", "thomas.berger@example.com", "Führungskraft", "Vorgesetzter", "Produktionsleiter", "Produktion", null],
-  ["Lea", "Hartmann", "lea.hartmann@example.com", "Mitarbeiter", "Mitarbeiter", "Schichtkoordination", "Produktion", "thomas.berger@example.com"],
-  ["Anna", "Leitner", "anna.leitner@example.com", "Führungskraft", "Vorgesetzter", "QS-Leitung", "Qualitätssicherung", null],
-  ["Sophie", "Audit", "sophie.audit@example.com", "Mitarbeiter", "Mitarbeiter", "Audit Specialist", "Qualitätssicherung", "anna.leitner@example.com"],
-  ["Julia", "Weiss", "julia.weiss@example.com", "Admin", "Vorgesetzter", "Verwaltungsleitung", "Verwaltung", null],
-  ["Markus", "Fink", "markus.fink@example.com", "Führungskraft", "Vorgesetzter", "Einkaufsleitung", "Einkauf", null],
-  ["Nina", "Hofer", "nina.hofer@example.com", "Führungskraft", "Vorgesetzter", "Logistikleitung", "Logistik", null],
-  ["Max", "Pruefer", "max.pruefer@example.com", "Mitarbeiter", "Mitarbeiter", "Interner Auditor", "Verwaltung", "julia.weiss@example.com"]
+  ["Miriam", "Keller", "miriam.keller@example.com", "Admin", "IT-Leiterin", "IT", null],
+  ["David", "Rauch", "david.rauch@example.com", "Mitarbeiter", "System Engineer", "IT", "miriam.keller@example.com"],
+  ["Thomas", "Berger", "thomas.berger@example.com", "Führungskraft", "Produktionsleiter", "Produktion", null],
+  ["Lea", "Hartmann", "lea.hartmann@example.com", "Mitarbeiter", "Schichtkoordination", "Produktion", "thomas.berger@example.com"],
+  ["Anna", "Leitner", "anna.leitner@example.com", "Führungskraft", "QS-Leitung", "Qualitätssicherung", null],
+  ["Sophie", "Audit", "sophie.audit@example.com", "Mitarbeiter", "Audit Specialist", "Qualitätssicherung", "anna.leitner@example.com"],
+  ["Julia", "Weiss", "julia.weiss@example.com", "Admin", "Verwaltungsleitung", "Verwaltung", null],
+  ["Markus", "Fink", "markus.fink@example.com", "Führungskraft", "Einkaufsleitung", "Einkauf", null],
+  ["Nina", "Hofer", "nina.hofer@example.com", "Führungskraft", "Logistikleitung", "Logistik", null],
+  ["Max", "Pruefer", "max.pruefer@example.com", "Mitarbeiter", "Interner Auditor", "Verwaltung", "julia.weiss@example.com"]
 ];
 
 const documents = [
@@ -57,19 +57,19 @@ export async function seedDatabase() {
   const existingUsers = await get("SELECT COUNT(*) AS count FROM users");
   if (!existingUsers?.count) {
     for (const user of users) {
-      const [firstName, lastName, email, appRole, employeeRole, jobTitle, departmentName] = user;
+      const [firstName, lastName, email, appRole, jobTitle, departmentName] = user;
       const { hash, salt } = hashPassword("demo123");
       const result = await run(
         `INSERT INTO users (
-          first_name, last_name, email, app_role, employee_role, job_title, department_id, password_hash, password_salt
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-        [firstName, lastName, email, appRole, employeeRole, jobTitle, departmentIds.get(departmentName), hash, salt]
+          first_name, last_name, email, app_role, job_title, department_id, password_hash, password_salt
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+        [firstName, lastName, email, appRole, jobTitle, departmentIds.get(departmentName), hash, salt]
       );
       userIds.set(email, result.id);
     }
 
     for (const user of users) {
-      const [, , email, , , , , managerEmail] = user;
+      const [, , email, , , , managerEmail] = user;
       if (managerEmail) {
         await run("UPDATE users SET manager_id = ? WHERE email = ?", [userIds.get(managerEmail), email]);
       }

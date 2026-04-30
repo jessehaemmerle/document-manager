@@ -65,8 +65,7 @@ Demo-Logins:
 Die App enthält eine einfache Benutzerverwaltung unter `Benutzer`:
 
 - Benutzer mit Vorname, Nachname, E-Mail, Funktion und Aktivstatus
-- App-Rollen: `Admin`, `Führungskraft`, `Mitarbeiter`
-- Mitarbeiter-Rollen: `Vorgesetzter`, `Mitarbeiter`
+- Rollen: `Admin`, `Führungskraft`, `Mitarbeiter`
 - Zuordnung zu einer Abteilung
 - Optionaler Vorgesetzter pro Benutzer
 - Optionaler Vorgesetzter pro Abteilung

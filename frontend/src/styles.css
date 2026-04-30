@@ -364,8 +364,7 @@ td small {
 }
 
 .status-in-pruefung,
-.due-faellig,
-.role-auditor {
+.due-faellig {
   background: #fff2d6;
   color: var(--amber);
 }
@@ -383,9 +382,7 @@ td small {
 }
 
 .status-archiviert,
-.result-nicht-mehr-relevant,
-.role-viewer,
-.neutral {
+.result-nicht-mehr-relevant {
   background: #edf0f3;
   color: #516170;
 }

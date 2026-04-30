@@ -15,7 +15,6 @@ function publicUser(user) {
     full_name: user.full_name,
     email: user.email,
     app_role: user.app_role,
-    employee_role: user.employee_role,
     job_title: user.job_title,
     department_id: user.department_id,
     department_name: user.department_name

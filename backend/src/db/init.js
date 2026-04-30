@@ -26,7 +26,6 @@ export async function initDatabase() {
       last_name TEXT NOT NULL,
       email TEXT NOT NULL UNIQUE,
       app_role TEXT NOT NULL,
-      employee_role TEXT,
       job_title TEXT,
       department_id INTEGER,
       manager_id INTEGER,
@@ -106,8 +105,12 @@ export async function initDatabase() {
     )
     WHERE assigned_user_id IS NULL
   `);
-  await run("UPDATE users SET app_role = 'Mitarbeiter' WHERE app_role IN ('Auditor', 'Viewer') AND employee_role = 'Mitarbeiter'");
-  await run("UPDATE users SET app_role = 'Führungskraft' WHERE app_role IN ('Auditor', 'Viewer')");
+  if (await columnExists("users", "employee_role")) {
+    await run("UPDATE users SET app_role = 'Mitarbeiter' WHERE app_role IN ('Auditor', 'Viewer') AND employee_role = 'Mitarbeiter'");
+    await run("UPDATE users SET app_role = 'Führungskraft' WHERE app_role IN ('Auditor', 'Viewer')");
+  } else {
+    await run("UPDATE users SET app_role = 'Mitarbeiter' WHERE app_role IN ('Auditor', 'Viewer')");
+  }
   await ensureDefaultPasswords();
 }
 
@@ -116,6 +119,11 @@ async function ensureColumn(table, column, definition) {
   if (!columns.some((row) => row.name === column)) {
     await run(`ALTER TABLE ${table} ADD COLUMN ${column} ${definition}`);
   }
+}
+
+async function columnExists(table, column) {
+  const columns = await all(`PRAGMA table_info(${table})`);
+  return columns.some((row) => row.name === column);
 }
 
 async function ensureDefaultPasswords() {
