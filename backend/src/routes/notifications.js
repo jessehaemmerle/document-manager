@@ -2,6 +2,7 @@ import { Router } from "express";
 import { all } from "../db/database.js";
 import { requireRole } from "../middleware/roles.js";
 import { processAuditNotifications } from "../services/notifications.js";
+import { getMailTransportOptions, sendMail } from "../services/mail.js";
 
 export const notificationsRouter = Router();
 
@@ -24,6 +25,35 @@ notificationsRouter.get("/events", requireRole("Admin"), async (_req, res, next)
 notificationsRouter.post("/run", requireRole("Admin"), async (req, res, next) => {
   try {
     res.json(await processAuditNotifications(req.body?.reference_date));
+  } catch (error) {
+    next(error);
+  }
+});
+
+notificationsRouter.get("/mail-config", requireRole("Admin"), async (_req, res) => {
+  const options = getMailTransportOptions();
+  res.json({
+    host: options.host,
+    port: options.port,
+    secure: options.secure,
+    ignoreTLS: options.ignoreTLS,
+    requireTLS: options.requireTLS,
+    rejectUnauthorized: options.tls?.rejectUnauthorized,
+    hasAuth: Boolean(options.auth),
+    configured: Boolean(options.host)
+  });
+});
+
+notificationsRouter.post("/test-mail", requireRole("Admin"), async (req, res, next) => {
+  try {
+    const recipient = req.body?.to || req.user.email;
+    const result = await sendMail({
+      to: recipient,
+      subject: "DocAudit Testmail",
+      text: "Dies ist eine Testmail von DocAudit über den konfigurierten internen Mailserver.",
+      html: "<p>Dies ist eine Testmail von <strong>DocAudit</strong> über den konfigurierten internen Mailserver.</p>"
+    });
+    res.json({ ok: true, ...result });
   } catch (error) {
     next(error);
   }

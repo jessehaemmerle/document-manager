@@ -567,6 +567,29 @@ td small {
   border-bottom: 1px solid var(--line);
 }
 
+.mail-config,
+.inline-form {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-bottom: 12px;
+}
+
+.mail-config span {
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: #f6f8fb;
+  color: var(--muted);
+  padding: 7px 10px;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.inline-form input {
+  max-width: 320px;
+}
+
 .alert,
 .success,
 .empty {

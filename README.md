@@ -26,17 +26,24 @@ DATABASE_PATH=./data/document-audits.sqlite
 CLIENT_ORIGIN=http://localhost:5173
 APP_BASE_URL=http://localhost:5173
 AUTH_SECRET=change-this-for-production
-MAIL_HOST=
-MAIL_PORT=587
+MAIL_HOST=mail.mohren.net
+MAIL_PORT=25
 MAIL_USER=
 MAIL_PASSWORD=
-MAIL_FROM=
-MAIL_DRY_RUN=true
+MAIL_FROM=DocAudit <docaudit@mohren.net>
+MAIL_SECURE=false
+MAIL_IGNORE_TLS=false
+MAIL_REQUIRE_TLS=false
+MAIL_TLS_REJECT_UNAUTHORIZED=true
+MAIL_CONNECTION_TIMEOUT_MS=10000
+MAIL_DRY_RUN=false
 NOTIFICATIONS_ENABLED=true
 NOTIFICATION_CHECK_INTERVAL_MINUTES=60
 ```
 
 Wenn `MAIL_DRY_RUN=true` gesetzt ist oder kein `MAIL_HOST` konfiguriert ist, werden Mailereignisse nur protokolliert und in der Datenbank gespeichert.
+
+Für einen internen SMTP-Relay wie `mail.mohren.net` ist typischerweise Port `25` ohne Benutzer/Passwort korrekt. Falls der Server STARTTLS zwingend verlangt, setze `MAIL_REQUIRE_TLS=true`. Falls ein internes Zertifikat nicht öffentlich vertrauenswürdig ist, kann für interne Netze `MAIL_TLS_REJECT_UNAUTHORIZED=false` gesetzt werden.
 
 ## Struktur
 
@@ -115,3 +122,5 @@ Zusätzliche API-Endpunkte:
 - `GET /api/export/users`
 - `GET /api/notifications/events`
 - `POST /api/notifications/run`
+- `GET /api/notifications/mail-config`
+- `POST /api/notifications/test-mail`

@@ -844,12 +844,25 @@ function AuditHistory() {
 function SettingsPage() {
   const { role, canManage } = useRole();
   const events = useApi(canManage ? "/notifications/events" : null, []);
+  const mailConfig = useApi(canManage ? "/notifications/mail-config" : null, null);
   const [notificationResult, setNotificationResult] = useState("");
+  const [testMailTo, setTestMailTo] = useState("");
   const runNotifications = async () => {
     try {
       const result = await api("/notifications/run", { method: "POST", body: JSON.stringify({}) });
       setNotificationResult(`${result.processedDocuments} Dokument(e) geprüft, ${result.results.filter((item) => item.sent).length} Mailereignis(se) erzeugt.`);
       events.refresh();
+    } catch (err) {
+      setNotificationResult(err.message);
+    }
+  };
+  const sendTestMail = async () => {
+    try {
+      const result = await api("/notifications/test-mail", {
+        method: "POST",
+        body: JSON.stringify({ to: testMailTo || undefined })
+      });
+      setNotificationResult(`Testmail an ${result.recipients?.join(", ") || testMailTo} wurde ${result.dryRun ? "als Dry-Run protokolliert" : "versendet"}.`);
     } catch (err) {
       setNotificationResult(err.message);
     }
@@ -873,6 +886,17 @@ function SettingsPage() {
       </div>
       {canManage && (
         <Panel title="Mailbenachrichtigungen" actions={<button className="button secondary" onClick={runNotifications}>Jetzt prüfen</button>}>
+          {mailConfig.data && (
+            <div className="mail-config">
+              <span>SMTP: <strong>{mailConfig.data.host || "nicht konfiguriert"}:{mailConfig.data.port}</strong></span>
+              <span>TLS: {mailConfig.data.secure ? "SMTPS" : mailConfig.data.requireTLS ? "STARTTLS erforderlich" : mailConfig.data.ignoreTLS ? "deaktiviert" : "optional"}</span>
+              <span>Auth: {mailConfig.data.hasAuth ? "aktiv" : "ohne"}</span>
+            </div>
+          )}
+          <div className="inline-form">
+            <input placeholder="Testmail-Empfänger, optional" value={testMailTo} onChange={(event) => setTestMailTo(event.target.value)} />
+            <button className="button ghost" type="button" onClick={sendTestMail}>Testmail senden</button>
+          </div>
           {notificationResult && <div className="success">{notificationResult}</div>}
           <NotificationEvents rows={Array.isArray(events.data) ? events.data : []} />
         </Panel>

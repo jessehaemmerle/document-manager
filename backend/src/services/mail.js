@@ -3,21 +3,37 @@ import { config } from "../config.js";
 
 let transporter;
 
+export function getMailTransportOptions() {
+  return {
+    host: config.mail.host,
+    port: config.mail.port,
+    secure: config.mail.secure,
+    ignoreTLS: config.mail.ignoreTls,
+    requireTLS: config.mail.requireTls,
+    connectionTimeout: config.mail.connectionTimeoutMs,
+    greetingTimeout: config.mail.connectionTimeoutMs,
+    socketTimeout: config.mail.connectionTimeoutMs,
+    tls: {
+      rejectUnauthorized: config.mail.rejectUnauthorized
+    },
+    auth: config.mail.user
+      ? {
+          user: config.mail.user,
+          pass: config.mail.password
+        }
+      : undefined
+  };
+}
+
 function getTransporter() {
   if (!transporter) {
-    transporter = nodemailer.createTransport({
-      host: config.mail.host,
-      port: Number(config.mail.port || 587),
-      secure: Number(config.mail.port) === 465,
-      auth: config.mail.user
-        ? {
-            user: config.mail.user,
-            pass: config.mail.password
-          }
-        : undefined
-    });
+    transporter = nodemailer.createTransport(getMailTransportOptions());
   }
   return transporter;
+}
+
+export function resetMailTransporter() {
+  transporter = undefined;
 }
 
 export async function sendMail({ to, subject, text, html }) {

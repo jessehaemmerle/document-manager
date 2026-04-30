@@ -7,7 +7,14 @@ services:
       CLIENT_ORIGIN: http://localhost:8080
       APP_BASE_URL: http://localhost:8080
       AUTH_SECRET: change-this-for-production
-      MAIL_DRY_RUN: "true"
+      MAIL_HOST: mail.mohren.net
+      MAIL_PORT: 25
+      MAIL_FROM: "DocAudit <docaudit@mohren.net>"
+      MAIL_SECURE: "false"
+      MAIL_IGNORE_TLS: "false"
+      MAIL_REQUIRE_TLS: "false"
+      MAIL_TLS_REJECT_UNAUTHORIZED: "true"
+      MAIL_DRY_RUN: "false"
       NOTIFICATIONS_ENABLED: "true"
       NOTIFICATION_CHECK_INTERVAL_MINUTES: 60
     volumes:
