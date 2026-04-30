@@ -1,9 +1,22 @@
 import nodemailer from "nodemailer";
+import fs from "node:fs";
 import { config } from "../config.js";
 
 let transporter;
 
 export function getMailTransportOptions() {
+  const tls = {
+    rejectUnauthorized: config.mail.rejectUnauthorized
+  };
+
+  if (config.mail.tlsServername) {
+    tls.servername = config.mail.tlsServername;
+  }
+
+  if (config.mail.tlsCaFile) {
+    tls.ca = fs.readFileSync(config.mail.tlsCaFile);
+  }
+
   return {
     host: config.mail.host,
     port: config.mail.port,
@@ -13,9 +26,7 @@ export function getMailTransportOptions() {
     connectionTimeout: config.mail.connectionTimeoutMs,
     greetingTimeout: config.mail.connectionTimeoutMs,
     socketTimeout: config.mail.connectionTimeoutMs,
-    tls: {
-      rejectUnauthorized: config.mail.rejectUnauthorized
-    },
+    tls,
     auth: config.mail.user
       ? {
           user: config.mail.user,
@@ -32,8 +43,25 @@ function getTransporter() {
   return transporter;
 }
 
+function explainMailError(error) {
+  const details = [error.message].filter(Boolean).join(" ");
+  if (/certificate|cert|self signed|unable to verify/i.test(details)) {
+    error.message = `${error.message} Hinweis: Der SMTP-Server verwendet vermutlich ein internes Zertifikat. Pruefe, ob MAIL_TLS_REJECT_UNAUTHORIZED=false im laufenden Container ankommt, oder hinterlege das interne CA-Zertifikat mit MAIL_TLS_CA_FILE.`;
+  }
+  return error;
+}
+
 export function resetMailTransporter() {
   transporter = undefined;
+}
+
+export async function verifyMailTransport() {
+  try {
+    await getTransporter().verify();
+    return { ok: true };
+  } catch (error) {
+    throw explainMailError(error);
+  }
 }
 
 export async function sendMail({ to, subject, text, html }) {
@@ -47,12 +75,16 @@ export async function sendMail({ to, subject, text, html }) {
     return { dryRun: true, recipients };
   }
 
-  const info = await getTransporter().sendMail({
-    from: config.mail.from || "DocAudit <no-reply@localhost>",
-    to: recipients.join(", "),
-    subject,
-    text,
-    html
-  });
-  return { dryRun: false, recipients, messageId: info.messageId };
+  try {
+    const info = await getTransporter().sendMail({
+      from: config.mail.from || "DocAudit <no-reply@localhost>",
+      to: recipients.join(", "),
+      subject,
+      text,
+      html
+    });
+    return { dryRun: false, recipients, messageId: info.messageId };
+  } catch (error) {
+    throw explainMailError(error);
+  }
 }

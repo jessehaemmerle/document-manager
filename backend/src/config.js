@@ -1,6 +1,10 @@
 import dotenv from "dotenv";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
 
-dotenv.config();
+const currentDir = path.dirname(fileURLToPath(import.meta.url));
+dotenv.config({ path: path.resolve(currentDir, "../../.env") });
+dotenv.config({ path: path.resolve(currentDir, "../.env") });
 
 function boolEnv(name, fallback = false) {
   const value = process.env[name];
@@ -24,6 +28,8 @@ export const config = {
     ignoreTls: boolEnv("MAIL_IGNORE_TLS", false),
     requireTls: boolEnv("MAIL_REQUIRE_TLS", false),
     rejectUnauthorized: boolEnv("MAIL_TLS_REJECT_UNAUTHORIZED", true),
+    tlsServername: process.env.MAIL_TLS_SERVERNAME || process.env.MAIL_HOST || "",
+    tlsCaFile: process.env.MAIL_TLS_CA_FILE || "",
     connectionTimeoutMs: Number(process.env.MAIL_CONNECTION_TIMEOUT_MS || 10000)
   },
   notifications: {

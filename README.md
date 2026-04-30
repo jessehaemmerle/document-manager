@@ -30,11 +30,13 @@ MAIL_HOST=mail.mohren.net
 MAIL_PORT=25
 MAIL_USER=
 MAIL_PASSWORD=
-MAIL_FROM=DocAudit <docaudit@mohren.net>
+MAIL_FROM="DocAudit <docaudit@mohren.net>"
 MAIL_SECURE=false
 MAIL_IGNORE_TLS=false
 MAIL_REQUIRE_TLS=false
 MAIL_TLS_REJECT_UNAUTHORIZED=true
+MAIL_TLS_SERVERNAME=mail.mohren.net
+MAIL_TLS_CA_FILE=
 MAIL_CONNECTION_TIMEOUT_MS=10000
 MAIL_DRY_RUN=false
 NOTIFICATIONS_ENABLED=true
@@ -44,6 +46,27 @@ NOTIFICATION_CHECK_INTERVAL_MINUTES=60
 Wenn `MAIL_DRY_RUN=true` gesetzt ist oder kein `MAIL_HOST` konfiguriert ist, werden Mailereignisse nur protokolliert und in der Datenbank gespeichert.
 
 Für einen internen SMTP-Relay wie `mail.mohren.net` ist typischerweise Port `25` ohne Benutzer/Passwort korrekt. Falls der Server STARTTLS zwingend verlangt, setze `MAIL_REQUIRE_TLS=true`. Falls ein internes Zertifikat nicht öffentlich vertrauenswürdig ist, kann für interne Netze `MAIL_TLS_REJECT_UNAUTHORIZED=false` gesetzt werden.
+
+Wichtig bei Docker: `.env.example` ist nur eine Vorlage. Lege eine echte `.env` im Projektordner an, damit `docker-compose.yml` die Werte übernimmt. Nach Änderungen an Mail-Variablen den Container neu erstellen:
+
+```bash
+docker compose up --build --force-recreate
+```
+
+Wenn trotz `MAIL_TLS_REJECT_UNAUTHORIZED=false` weiter `unable to verify the first certificate` erscheint, kommt der Wert sehr wahrscheinlich nicht im laufenden Container an. Prüfe im Admin-Bereich unter Mailbenachrichtigungen die angezeigte SMTP-Konfiguration. Alternativ kann STARTTLS fuer einen rein internen Relay deaktiviert werden:
+
+```bash
+MAIL_IGNORE_TLS=true
+MAIL_REQUIRE_TLS=false
+MAIL_SECURE=false
+```
+
+Die sauberere produktive Variante ist ein internes CA-Zertifikat. Lege das Zertifikat z. B. unter `certs/mohren-root-ca.pem` ab und setze:
+
+```bash
+MAIL_TLS_REJECT_UNAUTHORIZED=true
+MAIL_TLS_CA_FILE=/certs/mohren-root-ca.pem
+```
 
 ## Struktur
 
@@ -123,4 +146,5 @@ Zusätzliche API-Endpunkte:
 - `GET /api/notifications/events`
 - `POST /api/notifications/run`
 - `GET /api/notifications/mail-config`
+- `POST /api/notifications/verify-mail`
 - `POST /api/notifications/test-mail`

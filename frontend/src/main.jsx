@@ -867,6 +867,14 @@ function SettingsPage() {
       setNotificationResult(err.message);
     }
   };
+  const verifyMail = async () => {
+    try {
+      await api("/notifications/verify-mail", { method: "POST" });
+      setNotificationResult("SMTP-Verbindung erfolgreich geprueft.");
+    } catch (err) {
+      setNotificationResult(err.message);
+    }
+  };
   return (
     <div className="stack">
       <div className="grid two align-start">
@@ -890,11 +898,14 @@ function SettingsPage() {
             <div className="mail-config">
               <span>SMTP: <strong>{mailConfig.data.host || "nicht konfiguriert"}:{mailConfig.data.port}</strong></span>
               <span>TLS: {mailConfig.data.secure ? "SMTPS" : mailConfig.data.requireTLS ? "STARTTLS erforderlich" : mailConfig.data.ignoreTLS ? "deaktiviert" : "optional"}</span>
+              <span>Zertifikat: {mailConfig.data.rejectUnauthorized ? "wird geprueft" : "Pruefung deaktiviert"}</span>
+              <span>CA: {mailConfig.data.hasCustomCa ? "intern hinterlegt" : "Systemspeicher"}</span>
               <span>Auth: {mailConfig.data.hasAuth ? "aktiv" : "ohne"}</span>
             </div>
           )}
           <div className="inline-form">
             <input placeholder="Testmail-Empfänger, optional" value={testMailTo} onChange={(event) => setTestMailTo(event.target.value)} />
+            <button className="button ghost" type="button" onClick={verifyMail}>SMTP pruefen</button>
             <button className="button ghost" type="button" onClick={sendTestMail}>Testmail senden</button>
           </div>
           {notificationResult && <div className="success">{notificationResult}</div>}

@@ -2,7 +2,7 @@ import { Router } from "express";
 import { all } from "../db/database.js";
 import { requireRole } from "../middleware/roles.js";
 import { processAuditNotifications } from "../services/notifications.js";
-import { getMailTransportOptions, sendMail } from "../services/mail.js";
+import { getMailTransportOptions, sendMail, verifyMailTransport } from "../services/mail.js";
 
 export const notificationsRouter = Router();
 
@@ -39,9 +39,19 @@ notificationsRouter.get("/mail-config", requireRole("Admin"), async (_req, res) 
     ignoreTLS: options.ignoreTLS,
     requireTLS: options.requireTLS,
     rejectUnauthorized: options.tls?.rejectUnauthorized,
+    tlsServername: options.tls?.servername,
+    hasCustomCa: Boolean(options.tls?.ca),
     hasAuth: Boolean(options.auth),
     configured: Boolean(options.host)
   });
+});
+
+notificationsRouter.post("/verify-mail", requireRole("Admin"), async (_req, res, next) => {
+  try {
+    res.json(await verifyMailTransport());
+  } catch (error) {
+    next(error);
+  }
 });
 
 notificationsRouter.post("/test-mail", requireRole("Admin"), async (req, res, next) => {
