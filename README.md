@@ -24,9 +24,18 @@ Kopiere bei Bedarf `.env.example` nach `.env` und passe Werte an:
 PORT=4000
 DATABASE_PATH=./data/document-audits.sqlite
 CLIENT_ORIGIN=http://localhost:5173
+AUTH_SECRET=change-this-for-production
+MAIL_HOST=
+MAIL_PORT=587
+MAIL_USER=
+MAIL_PASSWORD=
+MAIL_FROM=
+MAIL_DRY_RUN=true
+NOTIFICATIONS_ENABLED=true
+NOTIFICATION_CHECK_INTERVAL_MINUTES=60
 ```
 
-Mail-Variablen sind bereits vorbereitet, echter Mailversand ist im MVP noch nicht aktiv.
+Wenn `MAIL_DRY_RUN=true` gesetzt ist oder kein `MAIL_HOST` konfiguriert ist, werden Mailereignisse nur protokolliert und in der Datenbank gespeichert.
 
 ## Struktur
 
@@ -79,6 +88,16 @@ Neue Dokumentfelder:
 - `audit_department_id`: Abteilung, der das Audit fachlich zugeordnet ist
 - `assigned_user_id`: Benutzer, der das Audit persönlich sehen und bearbeiten darf
 
+## Mailbenachrichtigungen
+
+Der Backend-Job prüft automatisch in regelmäßigen Abständen fällige Dokumente:
+
+- am Prüfdatum: Mail an den persönlich zugewiesenen Benutzer, ersatzweise an die Führungskraft der Audit-Abteilung
+- 2 Tage nach Prüfdatum: weitere Mail, wenn der Dokumentstatus seit dem Prüfdatum unverändert ist
+- 5 Tage nach Prüfdatum: Eskalation, wenn der Status weiterhin unverändert ist; diese Mail geht zusätzlich an die Führungskraft
+
+Bereits versendete Stufen werden in `notification_events` gespeichert, damit keine doppelten Mails pro Dokument und Prüfdatum verschickt werden. Admins können den Lauf im Bereich `Admin` manuell starten und die letzten Mailereignisse ansehen.
+
 Zusätzliche API-Endpunkte:
 
 - `POST /api/auth/login`
@@ -91,3 +110,5 @@ Zusätzliche API-Endpunkte:
 - `DELETE /api/users/:id` mit optionalem Body `{ "replacement_user_id": 2 }` zur Übertragung zugewiesener Dokumente
 - `GET /api/departments/:id/users`
 - `GET /api/export/users`
+- `GET /api/notifications/events`
+- `POST /api/notifications/run`

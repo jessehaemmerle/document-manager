@@ -397,6 +397,17 @@ td small {
   color: #4d7c0f;
 }
 
+.delivery-sent,
+.delivery-dry-run {
+  background: #e3f4ea;
+  color: var(--green);
+}
+
+.delivery-failed {
+  background: #ffe4e4;
+  color: var(--red);
+}
+
 .bars {
   display: grid;
   gap: 12px;

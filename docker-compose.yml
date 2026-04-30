@@ -6,6 +6,9 @@ services:
       DATABASE_PATH: /app/data/document-audits.sqlite
       CLIENT_ORIGIN: http://localhost:8080
       AUTH_SECRET: change-this-for-production
+      MAIL_DRY_RUN: "true"
+      NOTIFICATIONS_ENABLED: "true"
+      NOTIFICATION_CHECK_INTERVAL_MINUTES: 60
     volumes:
       - audit-data:/app/data
     ports:

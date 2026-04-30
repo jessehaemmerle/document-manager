@@ -11,6 +11,8 @@ import { exportRouter } from "./routes/export.js";
 import { usersRouter } from "./routes/users.js";
 import { authRouter } from "./routes/auth.js";
 import { authenticate, requireAuth } from "./middleware/roles.js";
+import { notificationsRouter } from "./routes/notifications.js";
+import { startNotificationScheduler } from "./services/notifications.js";
 
 await initDatabase();
 
@@ -33,6 +35,7 @@ app.use("/api/users", usersRouter);
 app.use("/api/dashboard", dashboardRouter);
 app.use("/api/audits", auditsRouter);
 app.use("/api/export", exportRouter);
+app.use("/api/notifications", notificationsRouter);
 
 app.use((req, res) => {
   res.status(404).json({ error: `Route nicht gefunden: ${req.method} ${req.path}` });
@@ -45,4 +48,5 @@ app.use((err, _req, res, _next) => {
 
 app.listen(config.port, () => {
   console.log(`Document Audit API running on http://localhost:${config.port}/api`);
+  startNotificationScheduler();
 });

@@ -835,9 +835,21 @@ function AuditHistory() {
 }
 
 function SettingsPage() {
-  const { role } = useRole();
+  const { role, canManage } = useRole();
+  const events = useApi(canManage ? "/notifications/events" : "/auth/me", []);
+  const [notificationResult, setNotificationResult] = useState("");
+  const runNotifications = async () => {
+    try {
+      const result = await api("/notifications/run", { method: "POST", body: JSON.stringify({}) });
+      setNotificationResult(`${result.processedDocuments} Dokument(e) geprüft, ${result.results.filter((item) => item.sent).length} Mailereignis(se) erzeugt.`);
+      events.refresh();
+    } catch (err) {
+      setNotificationResult(err.message);
+    }
+  };
   return (
-    <div className="grid two align-start">
+    <div className="stack">
+      <div className="grid two align-start">
       <Panel title="Rollen & Zugriff">
         <p className="plain">Aktive MVP-Rolle: <strong>{role}</strong></p>
         <MiniBars data={{ Admin: role === "Admin" ? 1 : 0, Führungskraft: role === "Führungskraft" ? 1 : 0, Mitarbeiter: role === "Mitarbeiter" ? 1 : 0 }} />
@@ -848,9 +860,39 @@ function SettingsPage() {
           <li>Einfacher Login mit Token als Vorbereitung für zentrale Authentifizierung</li>
           <li>Archivieren statt hartem Löschen von Dokumenten</li>
           <li>CSV-Exports für Dokumente und Audit-Historie</li>
-          <li>Service-Platzhalter für spätere Mailbenachrichtigung</li>
+          <li>Automatische Mailbenachrichtigung mit Eskalationsstufen</li>
         </ul>
       </Panel>
+      </div>
+      {canManage && (
+        <Panel title="Mailbenachrichtigungen" actions={<button className="button secondary" onClick={runNotifications}>Jetzt prüfen</button>}>
+          {notificationResult && <div className="success">{notificationResult}</div>}
+          <NotificationEvents rows={Array.isArray(events.data) ? events.data : []} />
+        </Panel>
+      )}
+    </div>
+  );
+}
+
+function NotificationEvents({ rows }) {
+  if (!rows.length) return <Empty text="Noch keine Mailereignisse vorhanden." />;
+  return (
+    <div className="table-wrap">
+      <table>
+        <thead><tr><th>Dokument</th><th>Stufe</th><th>Prüfdatum</th><th>Status</th><th>Empfänger</th><th>Gesendet</th></tr></thead>
+        <tbody>
+          {rows.map((event) => (
+            <tr key={event.id}>
+              <td>{event.document_title}</td>
+              <td>{notificationStageLabel(event.stage)}</td>
+              <td>{formatDate(event.due_date)}</td>
+              <td><span className={`badge delivery-${event.delivery_status}`}>{event.delivery_status}</span></td>
+              <td>{formatRecipients(event.recipients)}</td>
+              <td>{formatDateTime(event.sent_at || event.created_at)}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
     </div>
   );
 }
@@ -951,6 +993,24 @@ function formatDate(value) {
 function formatDateTime(value) {
   if (!value) return "-";
   return new Intl.DateTimeFormat("de-AT", { dateStyle: "medium", timeStyle: "short" }).format(new Date(value.replace(" ", "T")));
+}
+
+function formatRecipients(value) {
+  try {
+    const recipients = JSON.parse(value || "[]");
+    return recipients.map((recipient) => recipient.name || recipient.email).join(", ") || "-";
+  } catch {
+    return "-";
+  }
+}
+
+function notificationStageLabel(stage) {
+  const labels = {
+    due: "Prüfdatum",
+    plus_2_same_status: "+2 Tage",
+    plus_5_leadership: "+5 Tage Führungskraft"
+  };
+  return labels[stage] || stage;
 }
 
 function slug(value = "") {

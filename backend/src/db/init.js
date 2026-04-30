@@ -86,6 +86,23 @@ export async function initDatabase() {
     )
   `);
 
+  await run(`
+    CREATE TABLE IF NOT EXISTS notification_events (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      document_id INTEGER NOT NULL,
+      due_date TEXT NOT NULL,
+      stage TEXT NOT NULL,
+      status_snapshot TEXT NOT NULL,
+      recipients TEXT NOT NULL,
+      delivery_status TEXT NOT NULL,
+      error_message TEXT,
+      sent_at TEXT,
+      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      UNIQUE(document_id, due_date, stage),
+      FOREIGN KEY (document_id) REFERENCES documents(id) ON DELETE CASCADE
+    )
+  `);
+
   const count = await get("SELECT COUNT(*) AS count FROM departments");
   if (!count?.count) {
     await seedDatabase();

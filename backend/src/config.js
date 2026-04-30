@@ -13,5 +13,10 @@ export const config = {
     user: process.env.MAIL_USER || "",
     password: process.env.MAIL_PASSWORD || "",
     from: process.env.MAIL_FROM || ""
+  },
+  notifications: {
+    enabled: process.env.NOTIFICATIONS_ENABLED !== "false",
+    dryRun: process.env.MAIL_DRY_RUN === "true" || !process.env.MAIL_HOST,
+    checkIntervalMinutes: Number(process.env.NOTIFICATION_CHECK_INTERVAL_MINUTES || 60)
   }
 };
