@@ -82,7 +82,23 @@ data/      lokale SQLite-Datenbank, wird automatisch erstellt
 docker compose up --build
 ```
 
-Dann ist das Frontend unter http://localhost:8080 erreichbar.
+Dann ist die App ueber den HTTPS-Reverse-Proxy unter https://localhost erreichbar.
+
+Der Reverse Proxy erwartet ein TLS-Zertifikat und den privaten Schluessel in:
+
+```text
+certs/server.crt
+certs/server.key
+```
+
+Fuer lokale Tests kann ein selbstsigniertes Zertifikat verwendet werden. In Produktion sollten `CLIENT_ORIGIN` und `APP_BASE_URL` in `.env` auf die echte HTTPS-URL gesetzt werden, z. B.:
+
+```bash
+CLIENT_ORIGIN=https://docs.company.net
+APP_BASE_URL=https://docs.company.net
+```
+
+HTTP-Anfragen auf Port 80 werden automatisch auf HTTPS weitergeleitet. Der Proxy leitet `/api/` direkt an das Backend weiter und alle anderen Pfade an das Frontend.
 
 ## Rollen im MVP
 
