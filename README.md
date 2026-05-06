@@ -14,7 +14,7 @@ Danach läuft die App standardmäßig unter:
 - Frontend: http://localhost:5173
 - Backend API: http://localhost:4000/api
 
-Beim ersten Backend-Start wird die SQLite-Datenbank automatisch angelegt und mit Beispieldaten befüllt.
+Beim ersten Backend-Start wird die SQLite-Datenbank automatisch angelegt. Falls noch keine Benutzer existieren, wird nur ein generischer Bootstrap-Admin erstellt.
 
 ## Umgebungsvariablen
 
@@ -86,19 +86,18 @@ Dann ist das Frontend unter http://localhost:8080 erreichbar.
 
 ## Rollen im MVP
 
-Die App hat jetzt einen einfachen Login. Seed-Benutzer verwenden im lokalen MVP das Passwort `demo123`.
+Die App hat einen einfachen Login. Der initiale Bootstrap-Admin ist nur fuer die Ersteinrichtung gedacht:
+
+- E-Mail: `admin@example.com`
+- Passwort: `admin123`
+
+Lege damit einen neuen Admin-Benutzer an und deaktiviere anschliessend den generischen Bootstrap-Admin.
 
 Nutzergruppen:
 
 - `Admin`: sieht und verwaltet alle Dokumente, Audits, Benutzer und Abteilungen
 - `Führungskraft`: sieht alle fälligen und historischen Audits der eigenen Audit-Abteilung und darf Dokumente für die eigene Abteilung anlegen/bearbeiten
 - `Mitarbeiter`: sieht nur Audits, die ihm persönlich zugewiesen sind
-
-Demo-Logins:
-
-- Admin: `miriam.keller@example.com`
-- Führungskraft: `anna.leitner@example.com`
-- Mitarbeiter: `sophie.audit@example.com`
 
 ## Benutzerverwaltung
 

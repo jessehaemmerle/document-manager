@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "node --watch src/server.js",
     "start": "node src/server.js",
-    "seed": "node src/db/seed-cli.js"
+    "bootstrap": "node src/db/bootstrap-cli.js"
   },
   "dependencies": {
     "cors": "^2.8.5",

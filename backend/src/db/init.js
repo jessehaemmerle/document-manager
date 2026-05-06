@@ -1,6 +1,5 @@
 import { all, run, get } from "./database.js";
-import { seedDatabase } from "./seed.js";
-import { hashPassword } from "../utils/passwords.js";
+import { ensureBootstrapAdmin, removeDemoData } from "./bootstrap.js";
 
 export async function initDatabase() {
   await run("PRAGMA foreign_keys = ON");
@@ -103,13 +102,8 @@ export async function initDatabase() {
     )
   `);
 
-  const count = await get("SELECT COUNT(*) AS count FROM departments");
-  if (!count?.count) {
-    await seedDatabase();
-  } else {
-    const userCount = await get("SELECT COUNT(*) AS count FROM users");
-    if (!userCount?.count) await seedDatabase();
-  }
+  await removeDemoData();
+  await ensureBootstrapAdmin();
 
   await run("UPDATE documents SET audit_department_id = department_id WHERE audit_department_id IS NULL");
   await run(`
@@ -128,7 +122,6 @@ export async function initDatabase() {
   } else {
     await run("UPDATE users SET app_role = 'Mitarbeiter' WHERE app_role IN ('Auditor', 'Viewer')");
   }
-  await ensureDefaultPasswords();
 }
 
 async function ensureColumn(table, column, definition) {
@@ -141,12 +134,4 @@ async function ensureColumn(table, column, definition) {
 async function columnExists(table, column) {
   const columns = await all(`PRAGMA table_info(${table})`);
   return columns.some((row) => row.name === column);
-}
-
-async function ensureDefaultPasswords() {
-  const users = await all("SELECT id FROM users WHERE password_hash IS NULL OR password_salt IS NULL");
-  for (const user of users) {
-    const { hash, salt } = hashPassword("demo123");
-    await run("UPDATE users SET password_hash = ?, password_salt = ? WHERE id = ?", [hash, salt, user.id]);
-  }
 }

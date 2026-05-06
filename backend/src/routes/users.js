@@ -121,6 +121,14 @@ usersRouter.put("/:id", requireRole("Admin"), async (req, res, next) => {
     if (Number(req.params.id) === Number(user.manager_id)) {
       throw Object.assign(new Error("Ein Benutzer kann nicht sein eigener Vorgesetzter sein."), { status: 400 });
     }
+    const targetUser = await get("SELECT id, app_role, is_active FROM users WHERE id = ?", [req.params.id]);
+    if (!targetUser) throw Object.assign(new Error("Benutzer nicht gefunden."), { status: 404 });
+    if (targetUser.app_role === "Admin" && targetUser.is_active && (user.app_role !== "Admin" || !user.is_active)) {
+      const activeAdmins = await get("SELECT COUNT(*) AS count FROM users WHERE app_role = 'Admin' AND is_active = 1");
+      if (activeAdmins.count <= 1) {
+        throw Object.assign(new Error("Der letzte aktive Admin kann nicht deaktiviert oder umgestuft werden."), { status: 409 });
+      }
+    }
     const passwordUpdate = req.body.password ? ", password_hash = ?, password_salt = ?" : "";
     const passwordParams = [];
     if (req.body.password) {
@@ -142,6 +150,16 @@ usersRouter.put("/:id", requireRole("Admin"), async (req, res, next) => {
 
 usersRouter.delete("/:id", requireRole("Admin"), async (req, res, next) => {
   try {
+    const targetUser = await get("SELECT id, app_role, is_active FROM users WHERE id = ?", [req.params.id]);
+    if (!targetUser) throw Object.assign(new Error("Benutzer nicht gefunden."), { status: 404 });
+
+    if (targetUser.app_role === "Admin" && targetUser.is_active) {
+      const activeAdmins = await get("SELECT COUNT(*) AS count FROM users WHERE app_role = 'Admin' AND is_active = 1");
+      if (activeAdmins.count <= 1) {
+        throw Object.assign(new Error("Der letzte aktive Admin kann nicht deaktiviert werden."), { status: 409 });
+      }
+    }
+
     const assigned = await get("SELECT COUNT(*) AS count FROM documents WHERE assigned_user_id = ?", [req.params.id]);
     if (assigned.count) {
       const replacementUserId = req.body?.replacement_user_id;

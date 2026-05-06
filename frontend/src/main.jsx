@@ -194,7 +194,7 @@ function Shell({ children }) {
 
 function LoginPage() {
   const { login } = useRole();
-  const [form, setForm] = useState({ email: "miriam.keller@example.com", password: "demo123" });
+  const [form, setForm] = useState({ email: "admin@example.com", password: "" });
   const [error, setError] = useState("");
 
   const submit = async (event) => {
@@ -212,16 +212,11 @@ function LoginPage() {
       <section className="login-panel">
         <div className="brand login-brand"><ShieldCheck /><span>DocAudit</span></div>
         <h1>Anmelden</h1>
-        <p>Demo-Passwort für Seed-Benutzer: <strong>demo123</strong></p>
+        <p>Initialer Admin-Zugang: <strong>admin@example.com</strong></p>
         <FormMessage error={error} />
         <form className="form-grid single" onSubmit={submit}>
           <Field label="E-Mail"><input type="email" required value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} /></Field>
           <Field label="Passwort"><input type="password" required value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} /></Field>
-          <div className="login-hints">
-            <button type="button" onClick={() => setForm({ email: "miriam.keller@example.com", password: "demo123" })}>Admin</button>
-            <button type="button" onClick={() => setForm({ email: "anna.leitner@example.com", password: "demo123" })}>Führungskraft</button>
-            <button type="button" onClick={() => setForm({ email: "sophie.audit@example.com", password: "demo123" })}>Mitarbeiter</button>
-          </div>
           <button className="button" type="submit">Einloggen</button>
         </form>
       </section>
