@@ -26,16 +26,16 @@ DATABASE_PATH=./data/document-audits.sqlite
 CLIENT_ORIGIN=http://localhost:5173
 APP_BASE_URL=http://localhost:5173
 AUTH_SECRET=change-this-for-production
-MAIL_HOST=mail.mohren.net
+MAIL_HOST=mail.company.net
 MAIL_PORT=25
 MAIL_USER=
 MAIL_PASSWORD=
-MAIL_FROM="DocAudit <docaudit@mohren.net>"
+MAIL_FROM="DocAudit <docaudit@company.net>"
 MAIL_SECURE=false
 MAIL_IGNORE_TLS=false
 MAIL_REQUIRE_TLS=false
 MAIL_TLS_REJECT_UNAUTHORIZED=true
-MAIL_TLS_SERVERNAME=mail.mohren.net
+MAIL_TLS_SERVERNAME=mail.company.net
 MAIL_TLS_CA_FILE=
 MAIL_CONNECTION_TIMEOUT_MS=10000
 MAIL_DRY_RUN=false
@@ -45,7 +45,7 @@ NOTIFICATION_CHECK_INTERVAL_MINUTES=60
 
 Wenn `MAIL_DRY_RUN=true` gesetzt ist oder kein `MAIL_HOST` konfiguriert ist, werden Mailereignisse nur protokolliert und in der Datenbank gespeichert.
 
-Für einen internen SMTP-Relay wie `mail.mohren.net` ist typischerweise Port `25` ohne Benutzer/Passwort korrekt. Falls der Server STARTTLS zwingend verlangt, setze `MAIL_REQUIRE_TLS=true`. Falls ein internes Zertifikat nicht öffentlich vertrauenswürdig ist, kann für interne Netze `MAIL_TLS_REJECT_UNAUTHORIZED=false` gesetzt werden.
+Für einen internen SMTP-Relay wie `mail.company.net` ist typischerweise Port `25` ohne Benutzer/Passwort korrekt. Falls der Server STARTTLS zwingend verlangt, setze `MAIL_REQUIRE_TLS=true`. Falls ein internes Zertifikat nicht öffentlich vertrauenswürdig ist, kann für interne Netze `MAIL_TLS_REJECT_UNAUTHORIZED=false` gesetzt werden.
 
 Wichtig bei Docker: `.env.example` ist nur eine Vorlage. Lege eine echte `.env` im Projektordner an, damit `docker-compose.yml` die Werte übernimmt. Nach Änderungen an Mail-Variablen den Container neu erstellen:
 
@@ -61,11 +61,11 @@ MAIL_REQUIRE_TLS=false
 MAIL_SECURE=false
 ```
 
-Die sauberere produktive Variante ist ein internes CA-Zertifikat. Lege das Zertifikat z. B. unter `certs/mohren-root-ca.pem` ab und setze:
+Die sauberere produktive Variante ist ein internes CA-Zertifikat. Lege das Zertifikat z. B. unter `certs/company-root-ca.pem` ab und setze:
 
 ```bash
 MAIL_TLS_REJECT_UNAUTHORIZED=true
-MAIL_TLS_CA_FILE=/certs/mohren-root-ca.pem
+MAIL_TLS_CA_FILE=/certs/company-root-ca.pem
 ```
 
 ## Struktur
