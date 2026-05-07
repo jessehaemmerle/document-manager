@@ -113,6 +113,18 @@ Die App hat einen einfachen Login. Der initiale Bootstrap-Admin ist nur fuer die
 
 Lege damit einen neuen Admin-Benutzer an und deaktiviere anschliessend den generischen Bootstrap-Admin.
 
+`BOOTSTRAP_ADMIN_PASSWORD` wird nur beim ersten Erstellen des Bootstrap-Admins verwendet. Wenn bereits ein aktiver Admin im persistenten Docker-Volume existiert, wird dessen Passwort beim Neustart nicht automatisch ueberschrieben. Zum bewussten Zuruecksetzen auf die aktuellen `.env`-Werte:
+
+```bash
+docker compose exec backend npm run reset-bootstrap-admin
+```
+
+Falls der Backend-Container gerade nicht laeuft:
+
+```bash
+docker compose run --rm backend npm run reset-bootstrap-admin
+```
+
 ## Produktionssicherheit
 
 Setze fuer Produktion mindestens:

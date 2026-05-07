@@ -1,6 +1,6 @@
 import { get, run } from "./database.js";
 import { config } from "../config.js";
-import { hashPassword } from "../utils/passwords.js";
+import { assertPasswordStrength, hashPassword } from "../utils/passwords.js";
 
 const demoEmails = [
   "miriam.keller@example.com",
@@ -78,7 +78,20 @@ export async function ensureBootstrapAdmin() {
   if (!bootstrapAdmin.password) {
     throw new Error("No active admin exists. Set BOOTSTRAP_ADMIN_PASSWORD once to create the initial admin.");
   }
+  if (config.isProduction) assertPasswordStrength(bootstrapAdmin.password);
 
+  await upsertBootstrapAdmin();
+}
+
+export async function resetBootstrapAdminPassword() {
+  if (!bootstrapAdmin.password) {
+    throw new Error("Set BOOTSTRAP_ADMIN_PASSWORD before resetting the bootstrap admin password.");
+  }
+  assertPasswordStrength(bootstrapAdmin.password);
+  return upsertBootstrapAdmin();
+}
+
+async function upsertBootstrapAdmin() {
   const { hash, salt } = hashPassword(bootstrapAdmin.password);
   const existingBootstrap = await get("SELECT id FROM users WHERE LOWER(email) = LOWER(?)", [bootstrapAdmin.email]);
   if (existingBootstrap) {
@@ -97,7 +110,7 @@ export async function ensureBootstrapAdmin() {
         existingBootstrap.id
       ]
     );
-    return;
+    return { email: bootstrapAdmin.email, created: false };
   }
 
   await run(
@@ -117,6 +130,7 @@ export async function ensureBootstrapAdmin() {
       1
     ]
   );
+  return { email: bootstrapAdmin.email, created: true };
 }
 
 function placeholders(values) {
