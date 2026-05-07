@@ -14,11 +14,16 @@ services:
   backend:
     build: ./backend
     environment:
+      NODE_ENV: "${NODE_ENV:-production}"
       PORT: 4000
       DATABASE_PATH: /app/data/document-audits.sqlite
-      CLIENT_ORIGIN: "${CLIENT_ORIGIN:-https://localhost}"
-      APP_BASE_URL: "${APP_BASE_URL:-https://localhost}"
-      AUTH_SECRET: change-this-for-production
+      CLIENT_ORIGIN: "${CLIENT_ORIGIN:?Set CLIENT_ORIGIN to the public HTTPS origin}"
+      APP_BASE_URL: "${APP_BASE_URL:?Set APP_BASE_URL to the public HTTPS URL}"
+      AUTH_SECRET: "${AUTH_SECRET:?Set AUTH_SECRET to a unique value with at least 32 characters}"
+      AUTH_TOKEN_TTL_MINUTES: "${AUTH_TOKEN_TTL_MINUTES:-480}"
+      BOOTSTRAP_ADMIN_EMAIL: "${BOOTSTRAP_ADMIN_EMAIL:-admin@example.com}"
+      BOOTSTRAP_ADMIN_PASSWORD: "${BOOTSTRAP_ADMIN_PASSWORD:-}"
+      JSON_BODY_LIMIT: "${JSON_BODY_LIMIT:-100kb}"
       MAIL_HOST: "${MAIL_HOST:-mail.mohren.net}"
       MAIL_PORT: "${MAIL_PORT:-25}"
       MAIL_USER: "${MAIL_USER:-}"

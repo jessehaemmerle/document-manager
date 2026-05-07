@@ -1,4 +1,5 @@
 import { get, run } from "./database.js";
+import { config } from "../config.js";
 import { hashPassword } from "../utils/passwords.js";
 
 const demoEmails = [
@@ -32,8 +33,8 @@ const demoDepartments = ["IT", "Produktion", "Verwaltung", "Einkauf", "Logistik"
 const bootstrapAdmin = {
   firstName: "Bootstrap",
   lastName: "Admin",
-  email: "admin@example.com",
-  password: "admin123"
+  email: config.bootstrapAdmin.email,
+  password: config.bootstrapAdmin.password
 };
 
 export async function removeDemoData() {
@@ -74,6 +75,9 @@ export async function removeDemoData() {
 export async function ensureBootstrapAdmin() {
   const activeAdmins = await get("SELECT COUNT(*) AS count FROM users WHERE app_role = 'Admin' AND is_active = 1");
   if (activeAdmins?.count) return;
+  if (!bootstrapAdmin.password) {
+    throw new Error("No active admin exists. Set BOOTSTRAP_ADMIN_PASSWORD once to create the initial admin.");
+  }
 
   const { hash, salt } = hashPassword(bootstrapAdmin.password);
   const existingBootstrap = await get("SELECT id FROM users WHERE LOWER(email) = LOWER(?)", [bootstrapAdmin.email]);

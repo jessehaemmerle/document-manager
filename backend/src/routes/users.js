@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { all, get, run } from "../db/database.js";
 import { requireRole } from "../middleware/roles.js";
-import { hashPassword } from "../utils/passwords.js";
+import { assertPasswordStrength, hashPassword } from "../utils/passwords.js";
 import { assertEmail, assertOneOf, requireFields, userRoles } from "../utils/validation.js";
 
 export const usersRouter = Router();
@@ -102,6 +102,7 @@ usersRouter.post("/", requireRole("Admin"), async (req, res, next) => {
   try {
     const user = normalizeUser(req.body);
     requireFields(req.body, ["password"]);
+    assertPasswordStrength(req.body.password);
     const { hash, salt } = hashPassword(req.body.password);
     const result = await run(
       `INSERT INTO users (
@@ -132,6 +133,7 @@ usersRouter.put("/:id", requireRole("Admin"), async (req, res, next) => {
     const passwordUpdate = req.body.password ? ", password_hash = ?, password_salt = ?" : "";
     const passwordParams = [];
     if (req.body.password) {
+      assertPasswordStrength(req.body.password);
       const { hash, salt } = hashPassword(req.body.password);
       passwordParams.push(hash, salt);
     }

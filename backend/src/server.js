@@ -18,9 +18,30 @@ await initDatabase();
 
 const app = express();
 
-app.use(cors({ origin: config.clientOrigin }));
-app.use(express.json());
-app.use(morgan("dev"));
+app.disable("x-powered-by");
+app.set("trust proxy", 1);
+
+app.use((req, res, next) => {
+  res.setHeader("X-Content-Type-Options", "nosniff");
+  res.setHeader("X-Frame-Options", "SAMEORIGIN");
+  res.setHeader("Referrer-Policy", "same-origin");
+  res.setHeader("Permissions-Policy", "camera=(), microphone=(), geolocation=()");
+  if (config.isProduction) {
+    res.setHeader("Strict-Transport-Security", "max-age=31536000; includeSubDomains");
+  }
+  next();
+});
+app.use(cors({
+  origin(origin, callback) {
+    if (!origin || config.clientOrigins.includes(origin.replace(/\/$/, ""))) {
+      callback(null, true);
+      return;
+    }
+    callback(Object.assign(new Error("CORS origin not allowed."), { status: 403 }));
+  }
+}));
+app.use(express.json({ limit: config.jsonBodyLimit }));
+app.use(morgan(config.isProduction ? "combined" : "dev"));
 
 app.get("/api/health", (_req, res) => {
   res.json({ ok: true });
@@ -42,8 +63,13 @@ app.use((req, res) => {
 });
 
 app.use((err, _req, res, _next) => {
-  console.error(err);
-  res.status(err.status || 500).json({ error: err.message || "Unerwarteter Serverfehler" });
+  const status = err.status || 500;
+  if (status >= 500) {
+    console.error(err);
+  } else if (!config.isProduction) {
+    console.warn(err.message);
+  }
+  res.status(status).json({ error: status >= 500 ? "Unerwarteter Serverfehler" : err.message });
 });
 
 app.listen(config.port, () => {

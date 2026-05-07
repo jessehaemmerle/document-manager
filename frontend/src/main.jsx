@@ -194,7 +194,7 @@ function Shell({ children }) {
 
 function LoginPage() {
   const { login } = useRole();
-  const [form, setForm] = useState({ email: "admin@example.com", password: "" });
+  const [form, setForm] = useState({ email: "", password: "" });
   const [error, setError] = useState("");
 
   const submit = async (event) => {
@@ -212,7 +212,6 @@ function LoginPage() {
       <section className="login-panel">
         <div className="brand login-brand"><ShieldCheck /><span>DocAudit</span></div>
         <h1>Anmelden</h1>
-        <p>Initialer Admin-Zugang: <strong>admin@example.com</strong></p>
         <FormMessage error={error} />
         <form className="form-grid single" onSubmit={submit}>
           <Field label="E-Mail"><input type="email" required value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} /></Field>

@@ -25,7 +25,11 @@ PORT=4000
 DATABASE_PATH=./data/document-audits.sqlite
 CLIENT_ORIGIN=http://localhost:5173
 APP_BASE_URL=http://localhost:5173
-AUTH_SECRET=change-this-for-production
+AUTH_SECRET=replace-with-at-least-32-random-characters
+AUTH_TOKEN_TTL_MINUTES=480
+BOOTSTRAP_ADMIN_EMAIL=admin@example.com
+BOOTSTRAP_ADMIN_PASSWORD=replace-with-a-temporary-strong-password
+JSON_BODY_LIMIT=100kb
 MAIL_HOST=mail.company.net
 MAIL_PORT=25
 MAIL_USER=
@@ -82,7 +86,7 @@ data/      lokale SQLite-Datenbank, wird automatisch erstellt
 docker compose up --build
 ```
 
-Dann ist die App ueber den HTTPS-Reverse-Proxy unter https://localhost erreichbar.
+Die Compose-Datei ist fuer produktionsnahe Starts gehaertet und verlangt `CLIENT_ORIGIN`, `APP_BASE_URL`, `AUTH_SECRET` und beim ersten Start ohne Admin `BOOTSTRAP_ADMIN_PASSWORD` in deiner `.env`. Fuer rein lokale Tests kannst du `NODE_ENV=development`, `CLIENT_ORIGIN=https://localhost` und `APP_BASE_URL=https://localhost` setzen.
 
 Der Reverse Proxy erwartet ein TLS-Zertifikat und den privaten Schluessel in:
 
@@ -105,9 +109,27 @@ HTTP-Anfragen auf Port 80 werden automatisch auf HTTPS weitergeleitet. Der Proxy
 Die App hat einen einfachen Login. Der initiale Bootstrap-Admin ist nur fuer die Ersteinrichtung gedacht:
 
 - E-Mail: `admin@example.com`
-- Passwort: `admin123`
+- Passwort: Wert aus `BOOTSTRAP_ADMIN_PASSWORD`
 
 Lege damit einen neuen Admin-Benutzer an und deaktiviere anschliessend den generischen Bootstrap-Admin.
+
+## Produktionssicherheit
+
+Setze fuer Produktion mindestens:
+
+```bash
+NODE_ENV=production
+CLIENT_ORIGIN=https://docs.company.net
+APP_BASE_URL=https://docs.company.net
+AUTH_SECRET=<mindestens-32-zufaellige-zeichen>
+BOOTSTRAP_ADMIN_PASSWORD=<nur-beim-ersten-start-ohne-admin>
+```
+
+Nach dem ersten Login: neuen Admin mit starkem Passwort anlegen, den Bootstrap-Admin deaktivieren und `BOOTSTRAP_ADMIN_PASSWORD` wieder aus der `.env` entfernen.
+
+Das Backend prueft Produktions-Defaults beim Start, Tokens laufen nach `AUTH_TOKEN_TTL_MINUTES` ab, Login-Versuche werden pro IP und E-Mail begrenzt, JSON-Bodies sind limitiert und neue Passwoerter muessen mindestens 12 Zeichen sowie Grossbuchstaben, Kleinbuchstaben und Zahlen enthalten.
+
+Der Reverse Proxy setzt HSTS, CSP, Referrer-Policy, Permissions-Policy, `X-Frame-Options` und `X-Content-Type-Options`. CSV-Exports schuetzen gegen Formel-Injection in Tabellenprogrammen. Interne Serverfehler werden in Produktion nicht mehr mit Details an Clients ausgegeben.
 
 Nutzergruppen:
 

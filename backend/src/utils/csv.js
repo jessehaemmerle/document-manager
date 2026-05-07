@@ -1,8 +1,12 @@
 function escapeCsv(value) {
   if (value === null || value === undefined) return "";
-  const stringValue = String(value);
+  const stringValue = preventCsvFormulaInjection(String(value));
   if (/[",\n]/.test(stringValue)) return `"${stringValue.replace(/"/g, '""')}"`;
   return stringValue;
+}
+
+function preventCsvFormulaInjection(value) {
+  return /^[=+\-@\t\r]/.test(value) ? `'${value}` : value;
 }
 
 export function toCsv(rows, columns) {
