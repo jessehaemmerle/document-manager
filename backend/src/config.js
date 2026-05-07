@@ -28,6 +28,7 @@ function splitOrigins(value) {
 const nodeEnv = process.env.NODE_ENV || "development";
 const isProduction = nodeEnv === "production";
 const clientOrigins = splitOrigins(process.env.CLIENT_ORIGIN || "http://localhost:5173");
+const appBaseUrl = (process.env.APP_BASE_URL || clientOrigins[0] || "http://localhost:5173").replace(/\/$/, "");
 const authSecret = process.env.AUTH_SECRET || "local-dev-change-me";
 const tokenTtlMinutes = numberEnv("AUTH_TOKEN_TTL_MINUTES", 480);
 const bootstrapAdminPassword = process.env.BOOTSTRAP_ADMIN_PASSWORD || (isProduction ? "" : "admin123");
@@ -39,6 +40,9 @@ if (isProduction) {
   if (!clientOrigins.length || clientOrigins.some((origin) => origin.includes("localhost") || origin.startsWith("http://"))) {
     throw new Error("CLIENT_ORIGIN must contain the public HTTPS origin in production.");
   }
+  if (appBaseUrl.includes("localhost") || appBaseUrl.startsWith("http://")) {
+    throw new Error("APP_BASE_URL must be set to the public HTTPS URL in production.");
+  }
 }
 
 export const config = {
@@ -47,7 +51,7 @@ export const config = {
   port: Number(process.env.PORT || 4000),
   databasePath: process.env.DATABASE_PATH || "./data/document-audits.sqlite",
   clientOrigins,
-  appBaseUrl: (process.env.APP_BASE_URL || process.env.CLIENT_ORIGIN || "http://localhost:5173").replace(/\/$/, ""),
+  appBaseUrl,
   authSecret,
   tokenTtlMs: tokenTtlMinutes * 60 * 1000,
   jsonBodyLimit: process.env.JSON_BODY_LIMIT || "100kb",

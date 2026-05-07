@@ -895,6 +895,7 @@ function SettingsPage() {
               <span>Zertifikat: {mailConfig.data.rejectUnauthorized ? "wird geprueft" : "Pruefung deaktiviert"}</span>
               <span>CA: {mailConfig.data.hasCustomCa ? "intern hinterlegt" : "Systemspeicher"}</span>
               <span>Auth: {mailConfig.data.hasAuth ? "aktiv" : "ohne"}</span>
+              <span>Links: <strong>{mailConfig.data.appBaseUrl}</strong></span>
             </div>
           )}
           <div className="inline-form">

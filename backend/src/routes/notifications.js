@@ -1,5 +1,6 @@
 import { Router } from "express";
 import { all } from "../db/database.js";
+import { config } from "../config.js";
 import { requireRole } from "../middleware/roles.js";
 import { processAuditNotifications } from "../services/notifications.js";
 import { getMailTransportOptions, sendMail, verifyMailTransport } from "../services/mail.js";
@@ -42,7 +43,8 @@ notificationsRouter.get("/mail-config", requireRole("Admin"), async (_req, res) 
     tlsServername: options.tls?.servername,
     hasCustomCa: Boolean(options.tls?.ca),
     hasAuth: Boolean(options.auth),
-    configured: Boolean(options.host)
+    configured: Boolean(options.host),
+    appBaseUrl: config.appBaseUrl
   });
 });
 

@@ -102,6 +102,18 @@ CLIENT_ORIGIN=https://docs.company.net
 APP_BASE_URL=https://docs.company.net
 ```
 
+`APP_BASE_URL` wird fuer direkte Links in Mailbenachrichtigungen verwendet. Wenn dort noch `localhost` auftaucht, kommt im Backend-Container noch ein alter oder falscher Wert an. Pruefe ihn mit:
+
+```bash
+docker compose exec backend printenv APP_BASE_URL
+```
+
+Nach Aenderungen an `.env` den Backend-Container neu erstellen:
+
+```bash
+docker compose up --build --force-recreate backend
+```
+
 HTTP-Anfragen auf Port 80 werden automatisch auf HTTPS weitergeleitet. Der Proxy leitet `/api/` direkt an das Backend weiter und alle anderen Pfade an das Frontend.
 
 ## Rollen im MVP
